@@ -181,4 +181,4 @@ cython_debug/
 .cursorindexingignore
 
 # ignore Bone Age Dataset folder
-BoneAgeDatasets/*
+data/*
