@@ -181,7 +181,9 @@ cython_debug/
 .cursorindexingignore
 
 # ignore Bone Age Dataset folder
-data/*.venv/
+data/*
+
+.venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
