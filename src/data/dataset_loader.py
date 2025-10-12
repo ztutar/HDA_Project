@@ -229,11 +229,16 @@ def image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:
    cos_angle = tf.cos(angle_rad)
    sin_angle = tf.sin(angle_rad)    
    # build the rotation matrix
-   transform = tf.concat([
-      cos_angle, -sin_angle, (1.0 - cos_angle) * center[0] + sin_angle * center[1],
-      sin_angle,  cos_angle, (1.0 - cos_angle) * center[1] - sin_angle * center[0],
-      0.0, 0.0
-   ], axis=0)
+   transform = tf.stack([
+      cos_angle, 
+      -sin_angle, 
+      (1.0 - cos_angle) * center[0] + sin_angle * center[1],
+      sin_angle,  
+      cos_angle, 
+      (1.0 - cos_angle) * center[1] - sin_angle * center[0],
+      tf.constant(0.0, dtype=tf.float32),
+      tf.constant(0.0, dtype=tf.float32),
+   ])
    transform = tf.reshape(transform, [1, 8])
    
    # apply the transformation
@@ -243,7 +248,8 @@ def image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:
       transforms=transform,
       output_shape=tf.shape(image)[1:3],
       interpolation="BILINEAR",
-      fill_mode="REFLECT"
+      fill_mode="REFLECT",
+      fill_value=0.0,
    )
    out = tf.squeeze(out, axis=0)  # [H,W,1]
    return out
