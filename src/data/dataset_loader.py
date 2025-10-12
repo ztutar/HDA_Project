@@ -22,6 +22,15 @@ import csv
 from typing import Dict, Tuple, List
 import numpy as np
 import tensorflow as tf
+import logging
+try:
+   # Try relative import when running as a package
+   from utils.logger import get_logger  # type: ignore
+except Exception:  # pragma: no cover - fallback in ad-hoc runs
+   try:
+      from src.utils.logger import get_logger  # type: ignore
+   except Exception:
+      get_logger = logging.getLogger  # type: ignore
 
 try:
    import cv2 # used only if CLAHE = True
@@ -38,6 +47,7 @@ def read_csv_labels(csv_path: str) -> List[Dict]:
    Returns:
        List[Dict]: A list of dicts: {'image_id': '4360', 'male': 1, 'age_months': 168.93}
    """
+   logger = get_logger(__name__)
    rows = []
    with open(csv_path, newline="") as csvfile:
       reader = csv.DictReader(csvfile)
@@ -47,6 +57,7 @@ def read_csv_labels(csv_path: str) -> List[Dict]:
          male = 1 if male_raw in ("1", "TRUE", "T", "YES", "Y") else 0
          age_months = float(r["Bone Age (months)"])
          rows.append({"image_id": image_id, "male": male, "age_months": age_months})
+   logger.info("Loaded %d rows from %s", len(rows), csv_path)
    return rows
 
 def build_id_to_path(image_dir: str) -> Dict[str, str]:
@@ -59,12 +70,14 @@ def build_id_to_path(image_dir: str) -> Dict[str, str]:
        Dict[str, str]: Mapping from image ID to file path.
    """
    pattern = os.path.join(image_dir, "*.png")
+   logger = get_logger(__name__)
    files = glob.glob(pattern)
    id_to_path = {}
    for f in files:
       base = os.path.basename(f)
       image_id = os.path.splitext(base)[0]
       id_to_path[image_id] = f
+   logger.debug("Indexed %d images in %s", len(id_to_path), image_dir)
    return id_to_path
 
 # ---------- Image processing helpers ----------
@@ -269,9 +282,11 @@ def make_dataset(
    Returns:
       tf.data.Dataset: A TensorFlow dataset yielding (image, label) pairs.  
    """
+   logger = get_logger(__name__)
    split = {"train": "train", "val": "validation", "validation":"validation", "test": "test"}[split.lower()]
    image_path = os.path.join(data_path, split)
    csv_path = os.path.join(data_path, f"{split}.csv")
+   logger.info("Preparing dataset | split=%s | image_path=%s", split, image_path)
    
    rows = read_csv_labels(csv_path)
    id_to_path = build_id_to_path(image_path)
@@ -289,7 +304,8 @@ def make_dataset(
       ages.append(r["age_months"])
       
    if len(missing) > 0:
-      print(f"[dataset_loader] WARNING: {len(missing)} images not found in {image_path}. \n {missing[:5]}")
+      logger.warning("%d images not found in %s. examples=%s", len(missing), image_path, missing[:5])
+   logger.info("Dataset stats | files=%d | genders=%d | ages=%d", len(paths), len(genders), len(ages))
    
    path_ds = tf.data.Dataset.from_tensor_slices(np.array(paths))
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
