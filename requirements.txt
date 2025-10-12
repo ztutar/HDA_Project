@@ -7,3 +7,4 @@ keras
 Ipython
 matplotlib
 pyyaml
+pytest
