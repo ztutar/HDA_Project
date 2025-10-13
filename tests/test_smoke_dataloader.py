@@ -16,12 +16,13 @@ import pytest
 import tensorflow as tf
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from src.data import dataset_loader
-from src.data.dataset_loader import make_dataset
-from src.utils.config import DataConfig, load_config
+from BoneAgePrediction.data import dataset_loader
+from BoneAgePrediction.data.dataset_loader import make_dataset
+from BoneAgePrediction.utils.config import DataConfig, load_config
 
 
 CONFIG_DIR = PROJECT_ROOT / "experiments" / "configs"
@@ -70,7 +71,8 @@ class ConfigCase:
 def _load_config_cases():
     cases = []
     for cfg_path in _collect_config_paths():
-        cfg = load_config(str(cfg_path))
+        cfg_bundle = load_config(str(cfg_path))
+        cfg = cfg_bundle.data
         batch_size = min(8, cfg.batch_size)
         shuffle_buffer = max(1, min(cfg.shuffle_buffer, 64))
         cases.append(
@@ -114,7 +116,7 @@ def test_dataloader_smoke(case: ConfigCase):
 
     dataset = make_dataset(
         data_path=str(data_root),
-        split=cfg.split,
+        split="train",
         target_h=cfg.target_h,
         target_w=cfg.target_w,
         keep_aspect_ratio=cfg.keep_aspect_ratio,
