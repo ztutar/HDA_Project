@@ -1,7 +1,7 @@
 #TODO: add docstring explanation for this module. write in details and explain each function
 
 
-from typing import Dict, Tuple
+from typing import Tuple
 from dataclasses import asdict
 import logging
 import os
@@ -28,11 +28,15 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Config & reproducibility
    # -----------------------
-   config = load_config(config_path)
+   config_bundle = load_config(config_path)
+   data_cfg = config_bundle.data
+   model_cfg = config_bundle.model
+   training_cfg = config_bundle.training
+   optimizer_cfg = training_cfg.optimizer
    set_seeds()
    config_filename = os.path.basename(config_path) if config_path else "default"
-   config_dict = asdict(config)
-   config_params = json.dumps(config_dict, sort_keys=True)
+   config_dict = asdict(config_bundle)
+   config_params = json.dumps(config_bundle.raw, sort_keys=True)
    model_name = "B0_GlobalCNN"
    logger.info(f"Starting {model_name} training using config %s", config_filename)
    logger.debug("Configuration parameters: %s", config_dict)
@@ -40,17 +44,17 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Data
    # -----------------------
-   data_path = config.data_path
-   target_h = config.target_h
-   target_w = config.target_w
-   keep_aspect_ratio = config.keep_aspect_ratio
-   pad_value = config.pad_value
-   batch_size = config.batch_size
-   shuffle_buffer = config.shuffle_buffer
-   num_workers = config.num_workers
-   clahe = config.clahe
-   augment = config.augment
-   cache = config.cache
+   data_path = data_cfg.data_path
+   target_h = data_cfg.target_h
+   target_w = data_cfg.target_w
+   keep_aspect_ratio = data_cfg.keep_aspect_ratio
+   pad_value = data_cfg.pad_value
+   batch_size = data_cfg.batch_size
+   shuffle_buffer = data_cfg.shuffle_buffer
+   num_workers = data_cfg.num_workers
+   clahe = data_cfg.clahe
+   augment = data_cfg.augment
+   cache = data_cfg.cache
    
    train_ds = make_dataset(
       data_path=data_path,
@@ -86,10 +90,10 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Model
    # -----------------------
-   input_shape = (target_h, target_w, channels)
-   num_blocks = config.num_blocks
-   channels = config.channels
-   dense_units = config.dense_units
+   channels = model_cfg.channels
+   num_blocks = model_cfg.num_blocks
+   dense_units = model_cfg.dense_units
+   input_shape = (target_h, target_w, 1)  # grayscale input
    
    model = build_GlobalCNN(
       input_shape=input_shape,
@@ -98,18 +102,20 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
       dense_units=dense_units,
    )
    logger.info(
-      f"Initialized {model_name} model with %d blocks and %d channels",
+      "%s architecture: %d blocks, channels=%s, dense_units=%d",
+      model_name,
       num_blocks,
       channels,
+      dense_units,
    )
    
    # -----------------------
    # Optimizer (Adam, fixed LR)
    # -----------------------
-   learning_rate = config.learning_rate
-   beta_1 = config.beta_1 # Exponential decay rate for the 1st moment estimates.
-   beta_2 = config.beta_2 # Exponential decay rate for the 2nd moment estimates.
-   epsilon = config.epsilon # Small constant for numerical stability.
+   learning_rate = optimizer_cfg.learning_rate
+   beta_1 = optimizer_cfg.beta_1 # Exponential decay rate for the 1st moment estimates.
+   beta_2 = optimizer_cfg.beta_2 # Exponential decay rate for the 2nd moment estimates.
+   epsilon = optimizer_cfg.epsilon # Small constant for numerical stability.
    optimizer = tf.keras.optimizers.Adam(
       learning_rate=learning_rate,
       beta_1=beta_1,
@@ -120,8 +126,8 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Loss & Metrics
    # -----------------------
-   loss_name = config.loss
-   delta = config.delta # only for Huber loss
+   loss_name = training_cfg.loss
+   delta = training_cfg.huber_delta # only for Huber loss
    loss_fn = get_loss(
       loss_name=loss_name,
       delta=delta,
@@ -141,11 +147,11 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # Callbacks
    # -----------------------
    save_dir = incremental_path(
-      save_dir=config.save_dir,
+      save_dir=training_cfg.save_dir,
       model_name=model_name,
       config_name=os.path.splitext(config_filename)[0],
    )
-   patience = config.patience
+   patience = training_cfg.patience
    callbacks = make_callbacks(
       save_dir=save_dir,
       model_name=model_name,
@@ -158,7 +164,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Train
    # -----------------------
-   epochs = config.epochs
+   epochs = training_cfg.epochs
    logger.info("Starting training for %d epochs", epochs)
    history = model.fit(
       train_ds,
@@ -188,7 +194,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    # Summary CSV
    # -----------------------
-   results_csv = config.results_csv
+   results_csv = training_cfg.results_csv
    os.makedirs(os.path.dirname(results_csv), exist_ok=True)
    header = [
       "model_name",

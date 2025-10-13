@@ -1,37 +1,30 @@
-#TODO: Add detailed explanation for the config file
+data:
+  data_path: "data/raw"
+  target_h: 576
+  target_w: 384
+  keep_aspect_ratio: true
+  pad_value: 0.0
+  batch_size: 16
+  shuffle_buffer: 1024
+  num_workers: 4
+  clahe: false
+  augment: true
+  cache: true
 
-# ---------- Data ----------
-data_path: "data/raw"            # Default path to raw data
-target_h:  576                   # Target image height
-target_w:  384                   # Target image width
-keep_aspect_ratio:  true         # Whether to keep aspect ratio when resizing
-pad_value:  0.0                  # Padding value when resizing with aspect ratio
+model:
+  num_blocks: 3
+  channels: [32, 64, 128]
+  dense_units: 64
 
-batch_size:  16                  # Default batch size
-shuffle_buffer:  1024            # Default shuffle buffer size
-num_workers:  4                  # Default number of workers for data loading
-clahe:  false                    # Whether to apply CLAHE
-augment:  true                   # Whether to apply data augmentation
-cache:  true                     # Whether to cache the dataset
-
-# ---------- Model ----------
-num_blocks: 3
-channels: [32, 64, 128]
-dense_units: 64
-
-# ---------- Training ----------
-epochs: 30
-
-# Adam (fixed LR)
-lr: 0.0003       # learning rate
-beta_1: 0.9
-beta_2: 0.999
-epsilon: 1e-7
-
-loss: "huber"    # or "mae"
-huber_delta: 10.0
-patience: 10  # Early stopping patience
-
-# ---------- Output ----------
-save_dir: "experiments/checkpoints"  # Directory to save model checkpoints
-results_csv: "experiments/train_results_summary.csv"  # CSV file to append results summary
+training:
+  epochs: 30
+  patience: 10
+  loss: "huber"
+  huber_delta: 10.0
+  save_dir: "experiments/checkpoints"
+  results_csv: "experiments/train_results_summary.csv"
+  optimizer:
+    learning_rate: 0.0003
+    beta_1: 0.9
+    beta_2: 0.999
+    epsilon: 1e-7
