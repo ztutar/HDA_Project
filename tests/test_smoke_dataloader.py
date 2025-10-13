@@ -36,13 +36,43 @@ def _collect_config_paths():
 class ConfigCase:
     path: Path
     config: DataConfig
+    batch_size: int
+    shuffle_buffer: int
+    num_workers: int
+    cache: bool
+    max_batches: int = 5
+
+    def id_string(self) -> str:
+        return (
+            f"{self.path.stem}"
+            f"[split={self.config.split},"
+            f"target={self.config.target_h}x{self.config.target_w},"
+            f"clahe={self.config.clahe},"
+            f"augment={self.config.augment},"
+            f"batch_size={self.batch_size},"
+            f"shuffle_buffer={self.shuffle_buffer},"
+            f"num_workers={self.num_workers},"
+            f"cache={self.cache},"
+            f"num_batches={self.max_batches}]"
+        )
 
 
 def _load_config_cases():
     cases = []
     for cfg_path in _collect_config_paths():
         cfg = load_config(str(cfg_path))
-        cases.append(ConfigCase(path=cfg_path, config=cfg))
+        batch_size = min(8, cfg.batch_size)
+        shuffle_buffer = max(1, min(cfg.shuffle_buffer, 64))
+        cases.append(
+            ConfigCase(
+                path=cfg_path,
+                config=cfg,
+                batch_size=batch_size,
+                shuffle_buffer=shuffle_buffer,
+                num_workers=1,
+                cache=False,
+            )
+        )
     return cases
 
 
@@ -54,14 +84,7 @@ if not CONFIG_CASES:
 @pytest.mark.parametrize(
     "case",
     CONFIG_CASES,
-    ids=lambda case: (
-        f"{case.path.stem}"
-        f"[split={case.config.split},"
-        f"target={case.config.target_h}x{case.config.target_w},"
-        f"clahe={case.config.clahe},"
-        f"augment={case.config.augment},"
-        f"batch={case.config.batch_size}]"
-    ),
+    ids=lambda case: case.id_string(),
 )
 def test_dataloader_smoke(case: ConfigCase):
     cfg = case.config
@@ -86,15 +109,15 @@ def test_dataloader_smoke(case: ConfigCase):
         target_w=cfg.target_w,
         keep_aspect_ratio=cfg.keep_aspect_ratio,
         pad_value=cfg.pad_value,
-        batch_size=cfg.batch_size,
-        shuffle_buffer=max(1, min(cfg.shuffle_buffer, 64)),
-        num_workers=1,
+        batch_size=case.batch_size,
+        shuffle_buffer=case.shuffle_buffer,
+        num_workers=case.num_workers,
         clahe=cfg.clahe,
         augment=cfg.augment,
-        cache=False,
+        cache=case.cache,
     )
 
-    max_batches = 5
+    max_batches = case.max_batches
     batch_count = 0
     for batch_count, (features, labels) in enumerate(dataset.take(max_batches), start=1):
         images = features["image"]
