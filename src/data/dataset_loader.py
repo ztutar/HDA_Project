@@ -43,9 +43,9 @@ def read_csv_labels(csv_path: str) -> List[Dict]:
    """
    Reads a CSV file with header: 'Image ID,male,Bone Age (months)'.
    Args:
-       csv_path (str): Path to the CSV file.
+      csv_path (str): Path to the CSV file.
    Returns:
-       List[Dict]: A list of dicts: {'image_id': '4360', 'male': 1, 'age_months': 168.93}
+      List[Dict]: A list of dicts: {'image_id': '4360', 'male': 1, 'age_months': 168.93}
    """
    logger = get_logger(__name__)
    rows = []
@@ -65,9 +65,9 @@ def build_id_to_path(image_dir: str) -> Dict[str, str]:
    Builds a mapping from image ID to full file path.
    'id' is the stem (filename without extension). e.g., '4360' -> '/.../4360.png'
    Args:
-       image_dir (str): Directory containing images.
+      image_dir (str): Directory containing images.
    Returns:
-       Dict[str, str]: Mapping from image ID to file path.
+      Dict[str, str]: Mapping from image ID to file path.
    """
    pattern = os.path.join(image_dir, "*.png")
    logger = get_logger(__name__)
@@ -85,17 +85,17 @@ def read_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
    """
    Reads and preprocesses a grayscale image from a file path.
    Args:
-       image_path (tf.Tensor): Path to the image file.
+      image_path (tf.Tensor): Path to the image file.
    Returns:
-       tf.Tensor: Preprocessed image tensor of shape (image_size, image_size, 1).
+      tf.Tensor: Preprocessed image tensor of shape (image_size, image_size, 1).
    """
    image = tf.io.read_file(image_path)
    image = tf.image.decode_png(image, channels=1)  # Grayscale
    image = tf.image.convert_image_dtype(image, tf.float32)  # Convert to float32
    return image # [H,W,1], float32 in [0,1]
 
-def resize_with_letterbox(img: tf.Tensor, target_h: int, target_w: int, 
-                          pad_value: float = 0.0) -> Tuple[tf.Tensor, Dict]:
+def resize_with_letterbox(img: tf.Tensor, target_h: int, target_w: int,
+                           pad_value: float = 0.0) -> Tuple[tf.Tensor, Dict]:
    """
    Resizes an image to fit within target_h x target_w while preserving aspect ratio.
    Pads the image with pad_value to achieve exact target size.
@@ -166,9 +166,9 @@ def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    Applies CLAHE to a grayscale image tensor.
    image: float32 [0,1], shape [H,W,1] -> apply CLAHE in numpy (uint8) -> back to float32 [0,1]
    Args:
-       image (tf.Tensor): Input image tensor of shape (H, W, 1) with dtype float32 in [0, 1].
+      image (tf.Tensor): Input image tensor of shape (H, W, 1) with dtype float32 in [0, 1].
    Returns:
-       tf.Tensor: CLAHE processed image tensor of shape (H, W, 1) with dtype float32 in [0, 1].
+      tf.Tensor: CLAHE processed image tensor of shape (H, W, 1) with dtype float32 in [0, 1].
    """
    image_uint8 = tf.image.convert_image_dtype(image, tf.uint8)  # [H,W,1], uint8 in [0,255]
    image_uint8 = tf.squeeze(image_uint8, axis=-1)  # [H,W], uint8
@@ -181,10 +181,10 @@ def zscore_norm(image: tf.Tensor, eps: float = 1e-7) -> tf.Tensor:
    """
    Applies z-score normalization to an image tensor.
    Args:
-       image (tf.Tensor): Input image tensor.
-       eps (float): Small epsilon value to avoid division by zero.
+      image (tf.Tensor): Input image tensor.
+      eps (float): Small epsilon value to avoid division by zero.
    Returns:
-       tf.Tensor: Z-score normalized image tensor.
+      tf.Tensor: Z-score normalized image tensor.
    """
    mean, variance = tf.nn.moments(image, axes=[0, 1], keepdims=True)
    stddev = tf.sqrt(variance)
@@ -195,9 +195,9 @@ def augment_image(image: tf.Tensor) -> tf.Tensor:
    Applies random data augmentations to an image tensor.
    Augmentations include random flips and rotations.
    Args:
-       image (tf.Tensor): Input image tensor of shape (H, W, C).  
+      image (tf.Tensor): Input image tensor of shape (H, W, C).  
    Returns:
-       tf.Tensor: Augmented image tensor.
+      tf.Tensor: Augmented image tensor.
    """
    # random flips
    image = tf.image.random_flip_left_right(image)
@@ -217,10 +217,10 @@ def image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:
    2) Use tf.raw_ops.ImageProjectiveTransformV3 to apply the transformation.
    3) Fill the empty pixels using "REFLECT" mode.
    Args:
-         image (tf.Tensor): Input image tensor of shape (H, W, C).
-         angle_rad (tf.Tensor): Rotation angle in radians (scalar).
+      image (tf.Tensor): Input image tensor of shape (H, W, C).
+      angle_rad (tf.Tensor): Rotation angle in radians (scalar).
    Returns:
-         tf.Tensor: Rotated image tensor of shape (H, W, C).
+      tf.Tensor: Rotated image tensor of shape (H, W, C).
    """
    # center-based rotation
    h = tf.cast(tf.shape(image)[0], tf.float32)
