@@ -1,3 +1,7 @@
+
+#TODO: Add docstring for the file in simple and plain English. make it detailed. Explain the purpose of the file and its main components.
+
+
 from typing import Literal
 import tensorflow as tf
 
