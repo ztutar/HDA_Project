@@ -1,19 +1,19 @@
-"""
-Dataset loader for bone age images and labels.
-The dataset is expected to be organized as follows:
-data/
-   ├── raw/
-   │     ├── train/
-   │     ├── validation/
-   │     └── test/
-   ├── train.csv
-   ├── validation.csv
-   └── test.csv
-The csv files should have the following columns:
-   'Image ID', 'male', 'Bone Age (months)'
-The loader supports optional CLAHE preprocessing, z-score normalization, and data augmentation.
-It returns a tf.data.Dataset yielding (image, label) pairs.
-Images are resized to a specified size (e.g., 512x512).
+
+"""Utility functions for loading and preparing the hand bone age dataset.
+
+This module brings together helpers for reading metadata from CSV files,
+linking those records to image files on disk, and preparing image tensors for
+TensorFlow workflows.
+
+Main components:
+   -  CSV helpers (`read_csv_labels`) that parse the bone age labels file and
+      normalize key fields such as the gender flag and bone age measurement.
+   -  File indexing helpers (`build_id_to_path`) that create fast lookups from
+      numeric study identifiers to the corresponding `.png` image path.
+   -  Image preprocessing routines (`read_image_grayscale`, optional CLAHE
+      helpers) that read images, convert them to grayscale tensors, and apply
+      optional contrast limited adaptive histogram equalization (CLAHE) when 
+      OpenCV is available.
 """
 
 import os

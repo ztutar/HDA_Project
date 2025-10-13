@@ -1,7 +1,13 @@
-"""
-This module provides a configuration class for data handling and a function to load configurations from a file.
-It supports both YAML and JSON formats for configuration files.
-The DataConfig class includes default values for various parameters related to data processing.
+
+"""Utilities for loading project configuration for data processing workflows.
+
+This module centralizes the configuration logic used across the project so that
+data-related settings are defined in a single place. The `DataConfig` data class
+captures the fields required to describe how raw imagery should be loaded,
+preprocessed, and batched, including the data split, resize options, and worker
+settings. The `load_config` helper reads configuration files in either YAML or
+JSON format, logs what is happening, and returns a ready-to-use `DataConfig`
+instance so the rest of the codebase can rely on consistent defaults.
 """
 
 from dataclasses import dataclass
@@ -20,16 +26,16 @@ class DataConfig:
    """
    Configuration class for data handling parameters. 
    Attributes:
-       data_path (str): Path to the raw data.
-       split (str): Data split type ('train', 'val', 'test').
-       image_size (int): Size of the images.
-       batch_size (int): Batch size for data loading.
-       shuffle_buffer (int): Buffer size for shuffling data.
-       num_workers (int): Number of workers for data loading.
-       clahe (bool): Whether to apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
-       augment (bool): Whether to apply data augmentation.
-       cache (bool): Whether to cache the dataset.
-       channels (int): Number of image channels.
+      data_path (str): Path to the raw data.
+      split (str): Data split type ('train', 'val', 'test').
+      image_size (int): Size of the images.
+      batch_size (int): Batch size for data loading.
+      shuffle_buffer (int): Buffer size for shuffling data.
+      num_workers (int): Number of workers for data loading.
+      clahe (bool): Whether to apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
+      augment (bool): Whether to apply data augmentation.
+      cache (bool): Whether to cache the dataset.
+      channels (int): Number of image channels.
    """
    data_path: str = "data/raw"            # Default path to raw data
    split: str = "train"                   # Options: 'train', 'val', 'test'
@@ -49,9 +55,9 @@ def load_config(path: Optional[str] = None) -> DataConfig:
    """
    Load configuration from a YAML or JSON file and return a DataConfig instance.
    Args:
-       path (Optional[str]): Path to the configuration file. If None, returns default DataConfig.
+      path (Optional[str]): Path to the configuration file. If None, returns default DataConfig.
    Returns:
-       DataConfig: An instance of DataConfig populated with values from the file or defaults.
+      DataConfig: An instance of DataConfig populated with values from the file or defaults.
    """
    logger = get_logger(__name__)
    if path is None:

@@ -1,3 +1,20 @@
+
+"""
+This module defines a configurable convolutional neural network that produces a
+single numeric prediction from input images. The network is built out of
+stacked convolutional blocks that perform feature extraction, followed by a
+global pooling layer that condenses the spatial information into one vector,
+and a pair of dense layers that map the extracted features to the final output.
+
+The `build_global_cnn` function is the main entry point. It lets callers
+select the input shape, how many convolutional blocks to use, how many filters
+each block should contain, and the size of the dense layer before the output.
+Internally it relies on the shared `conv_bn_relu` helper from
+`src.models.base_blocks` to assemble each convolutional block, creating a model
+that can be reused for different experiments with minimal changes.
+"""
+
+
 from typing import Sequence, Tuple
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Tensor
@@ -44,4 +61,3 @@ def build_global_cnn(input_shape: Tuple[int, int, int] = (512, 512, 1),
    
    model = Model(inputs=input_image, outputs=output_age, name=name)
    return model
-

@@ -1,3 +1,12 @@
+
+"""
+This file gathers reusable building blocks for convolutional neural networks in the project.
+It focuses on TensorFlow layers that follow the common pattern of convolution, batch normalization,
+and non-linear activation.
+The main component is the `conv_bn_relu` helper, which applies a 2D convolution, normalizes the
+output, and activates it with ReLU to keep feature maps stable and expressive.
+"""
+
 from typing import Tuple
 import tensorflow as tf
 from tensorflow.keras import layers, Tensor
@@ -20,5 +29,4 @@ def conv_bn_relu(x: tf.Tensor, filters:int, k_size:int = 3, s:int = 1) -> tf.Ten
    x = layers.BatchNormalization()(x)
    x = layers.ReLU()(x)
    return x
-
 

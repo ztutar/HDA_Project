@@ -1,3 +1,9 @@
+
+# Configuration for CLAHE-based preprocessing experiments.
+# Defines data location, image sizing, and loader parameters for reproducible runs.
+# Toggles CLAHE contrast enhancement, augmentation, caching, and channel handling.
+
+
 data_path: "data/raw"            # Default path to raw data
 split: "train"                   # Options: 'train', 'val', 'test'
 target_h:  512                   # Target image height
@@ -11,4 +17,3 @@ clahe:  true                     # Whether to apply CLAHE
 augment:  true                   # Whether to apply data augmentation
 cache:  true                     # Whether to cache the dataset
 channels:  1                     # Number of image channels
-

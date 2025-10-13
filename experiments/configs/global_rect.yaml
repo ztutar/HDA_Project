@@ -1,3 +1,5 @@
+#TODO: Add detailed explanation for the config file
+
 data_path: "data/raw"            # Default path to raw data
 split: "train"                   # Options: 'train', 'val', 'test'
 target_h:  576                   # Target image height
