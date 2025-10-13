@@ -136,7 +136,6 @@ def test_dataloader_smoke(case: ConfigCase):
         assert images.dtype == tf.float32
         assert genders.dtype == tf.int32
         assert labels.dtype == tf.float32
-        assert images.shape[-1] == cfg.channels
         assert images.shape[1] == cfg.target_h
         assert images.shape[2] == cfg.target_w
         assert genders.shape[0] == labels.shape[0] > 0

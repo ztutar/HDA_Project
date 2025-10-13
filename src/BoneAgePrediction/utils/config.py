@@ -16,9 +16,8 @@ import logging
 import yaml
 import json
 try:
-   # Prefer local logger utility if available
-   from .logger import get_logger  # type: ignore
-except Exception:  # fallback to stdlib
+   from BoneAgePrediction.utils.logger import get_logger  # type: ignore
+except ImportError:  # fallback to stdlib logger if package not installed
    get_logger = logging.getLogger  # type: ignore
 
 @dataclass
@@ -35,7 +34,6 @@ class DataConfig:
       clahe (bool): Whether to apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
       augment (bool): Whether to apply data augmentation.
       cache (bool): Whether to cache the dataset.
-      channels (int): Number of image channels.
    """
    data_path: str = "data/raw"            # Default path to raw data
    split: str = "train"                   # Options: 'train', 'val', 'test'
@@ -49,7 +47,6 @@ class DataConfig:
    clahe: bool = False                    # Whether to apply CLAHE
    augment: bool = False                  # Whether to apply data augmentation
    cache: bool = True                     # Whether to cache the dataset
-   channels: int = 1                      # Number of image channels
    
 def load_config(path: Optional[str] = None) -> DataConfig:
    """

@@ -14,6 +14,13 @@ from typing import Dict, Tuple
 import time
 import numpy as np
 import tensorflow as tf
+import logging
+try:
+   from BoneAgePrediction.utils.logger import get_logger  
+except ImportError:  # fallback when package not installed
+   get_logger = logging.getLogger  
+
+logger = get_logger(__name__)
 
 def mae() -> tf.keras.metrics.Metric:
    """
@@ -42,7 +49,9 @@ def count_params(model: tf.keras.Model) -> int:
    Returns:
       int: Total number of parameters.
    """
-   return int(model.count_params())
+   total = int(model.count_params())
+   logger.debug("Model %s has %d parameters", getattr(model, "name", "<unnamed>"), total)
+   return total
 
 def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> float:
    """
@@ -66,6 +75,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
    
    # Run one dummy forward pass to initialize layer shapes (so input/output_shape are defined for MACs).
    _ = model(tf.random.uniform((1, *input_shape), dtype=tf.float32), training=False)
+   logger.debug("Initialized model %s for GMAC estimation using input_shape=%s", getattr(model, "name", "<unnamed>"), input_shape)
    
    for layer in model.layers:
       # --- Convolutional layers ---
@@ -115,6 +125,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          pass  # Ignore other layers for MACs estimation
       
    gmacs = total_macs / 1e9  # Convert to GMacs
+   logger.info("Estimated %.4f GMACs for model %s", gmacs, getattr(model, "name", "<unnamed>"))
    return gmacs
 
 
@@ -133,10 +144,13 @@ class EpochTimer(tf.keras.callbacks.Callback):
       
    def on_train_begin(self, logs=None) -> None:
       self.epoch_times = []
+      logger.info("EpochTimer started timing training run.")
       
    def on_epoch_begin(self, epoch: int, logs=None) -> None:
       self.t0 = time.time()
+      logger.debug("Epoch %d started.", epoch + 1)
    
    def on_epoch_end(self, epoch: int, logs=None) -> None:
       self.epoch_times.append(time.time() - self.t0)
-      print(f"Epoch {epoch+1} time: {self.epoch_times[-1]:.2f} sec")
+      duration = self.epoch_times[-1]
+      logger.info("Epoch %d duration: %.2f sec", epoch + 1, duration)

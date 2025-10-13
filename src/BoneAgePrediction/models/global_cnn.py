@@ -18,9 +18,9 @@ that can be reused for different experiments with minimal changes.
 from typing import Sequence, Tuple
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Tensor
-from src.models.base_blocks import conv_bn_relu
+from BoneAgePrediction.models.base_blocks import conv_bn_relu
 
-def build_global_cnn(input_shape: Tuple[int, int, int] = (512, 512, 1),
+def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
                      num_blocks: int = 3,
                      channels: Sequence[int] = (32, 64, 128),
                      dense_units: int = 64,

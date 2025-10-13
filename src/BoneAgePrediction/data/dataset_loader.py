@@ -24,13 +24,9 @@ import numpy as np
 import tensorflow as tf
 import logging
 try:
-   # Try relative import when running as a package
-   from utils.logger import get_logger  # type: ignore
-except Exception:  # pragma: no cover - fallback in ad-hoc runs
-   try:
-      from src.utils.logger import get_logger  # type: ignore
-   except Exception:
-      get_logger = logging.getLogger  # type: ignore
+   from BoneAgePrediction.utils.logger import get_logger  
+except ImportError:  #fallback when package not installed
+   get_logger = logging.getLogger  
 
 try:
    import cv2 # used only if CLAHE = True
