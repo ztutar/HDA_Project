@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bone-age-prediction"
+version = "0.1.0"
+description = "Training pipeline and utilities for Bone Age Prediction."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Zeynep Tutar" }]
+dependencies = [
+    "pandas",
+    "numpy",
+    "tensorflow[and-cuda]",
+    "opencv-python",
+    "tqdm",
+    "keras",
+    "ipython",
+    "matplotlib",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["BoneAgePrediction*"]
