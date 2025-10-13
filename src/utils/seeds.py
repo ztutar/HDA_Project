@@ -1,9 +1,12 @@
-"""
-This module provides a function to set seeds for various libraries including
-Python's built-in random module, NumPy, and TensorFlow.
-It also sets the PYTHONHASHSEED environment variable.
+"""Utility helpers for keeping experiments repeatable.
 
-""" 
+This module contains a single helper function, `set_seeds`, that applies the
+same seed value across the Python standard library, NumPy, and TensorFlow. By
+calling it before running experiments or training models, we ensure that pseudo
+random number generators behave consistently across runs, which makes debugging
+and comparing results easier.
+"""
+
 
 import os
 import random

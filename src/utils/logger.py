@@ -1,3 +1,16 @@
+
+"""
+This module centralizes logging setup for the application and exposes helpers that
+keep log configuration consistent. It builds a logger with both console and optional
+file handlers, using readable timestamps and log level metadata. The module offers 
+two main entry points:
+
+-  `setup_logging` prepares the logging environment, creates the handlers, and ensures
+   all emitted messages respect the chosen verbosity and formatting.
+-  `get_logger` returns a named logger (or the root logger) so other modules can reuse
+   the shared configuration without duplicating setup code.
+"""
+
 import logging
 import os
 import sys
@@ -14,12 +27,12 @@ def setup_logging(
    Configure application logging with console and optional file handler.
    If the target logger already has handlers, it will be reused.
    Args:
-       log_dir: Directory where a timestamped log file is created. If None, file logging is disabled.
-       level: Log level name (e.g., "DEBUG", "INFO").
-       name: Logger name. Use None for root logger.
-       propagate: Whether logs propagate to ancestor loggers.
+      log_dir: Directory where a timestamped log file is created. If None, file logging is disabled.
+      level: Log level name (e.g., "DEBUG", "INFO").
+      name: Logger name. Use None for root logger.
+      propagate: Whether logs propagate to ancestor loggers.
    Returns:
-       logging.Logger: Configured logger instance.
+      logging.Logger: Configured logger instance.
    """
    logger = logging.getLogger(name or "")
    if logger.handlers:

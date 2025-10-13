@@ -1,3 +1,15 @@
+
+"""Utility module with helpers for monitoring Keras training runs.
+
+It exposes functions `mae` and `rmse`, which return ready-to-use
+regression metrics that keep track of prediction error over incoming batches.
+The `count_params` helper reports how many parameters a model owns and
+`estimate_gmacs` approximates how many multiply-accumulate operations a single
+forward pass consumes. The `EpochTimer` callback records the duration of each
+training epoch so that logs and reports can include timing information.
+"""
+
+
 from typing import Dict, Tuple
 import time
 import numpy as np

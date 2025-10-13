@@ -1,3 +1,16 @@
+
+"""
+This module prepares image datasets by running an offline CLAHE preprocessing step
+and duplicating the original CSV label files into a new directory. It imports helper
+utilities to read the label metadata and map image identifiers to file paths. The core 
+function, `offline_clahe`, walks through the train, validation, and test splits, 
+enhances each image with CLAHE (contrast limited adaptive histogram equalization), and 
+writes the processed results alongside the copied label files. When executed as a script, 
+the module parses command line options so a user can point to the source data folder, 
+choose an output location, and configure logging before running the preprocessing pipeline.
+"""
+
+
 import os
 import shutil
 import cv2
@@ -22,8 +35,8 @@ def offline_clahe(data_dir: str, out_dir: str) -> None:
    """
    Applies CLAHE to all images in the dataset and saves them to a new directory.
    Args:
-       data_dir (str): Path to the original data directory containing 'train', 'val', 'test' subdirectories.
-       out_dir (str): Path to the output directory where processed images will be saved.
+      data_dir (str): Path to the original data directory containing 'train', 'val', 'test' subdirectories.
+      out_dir (str): Path to the output directory where processed images will be saved.
    """
    logger = get_logger(__name__)
    if not os.path.exists(out_dir):
@@ -61,9 +74,9 @@ def offline_clahe(data_dir: str, out_dir: str) -> None:
 if __name__ == "__main__":
    parser = argparse.ArgumentParser(description="Apply CLAHE to dataset images offline.")
    parser.add_argument("--data_dir", type=str, required=True, 
-                       default="data/raw", help="Path to the original data directory.")
+                        default="data/raw", help="Path to the original data directory.")
    parser.add_argument("--out_dir", type=str, required=True, 
-                       default="data/proceesed/with_clahe", help="Path to the output directory for CLAHE processed images.")
+                        default="data/proceesed/with_clahe", help="Path to the output directory for CLAHE processed images.")
    parser.add_argument("--log_dir", type=str, default="experiments/logs", help="Directory for log files.")
    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level (e.g., INFO, DEBUG).")
    args = parser.parse_args()

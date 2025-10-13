@@ -1,3 +1,13 @@
+"""Smoke-test coverage for the dataset loader pipeline.
+
+This file checks that every YAML config in `experiments/configs` can build a
+TensorFlow dataset without raising errors. It discovers configs, loads each one
+into a frozen `ConfigCase`, and parametrizes the single test so every config
+is exercised. The helpers resolve project paths, adjust batch settings for the
+test run, and bail out early when required resources or optional dependencies
+are missing."""
+
+
 from dataclasses import dataclass
 import sys
 from pathlib import Path
