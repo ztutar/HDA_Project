@@ -293,7 +293,7 @@ def make_dataset(
    rows = read_csv_labels(csv_path)
    id_to_path = build_id_to_path(image_path)
    
-   paths, genders, ages = [], [], []
+   paths, genders, ages, ids = [], [], [], []
    missing = []
    for r in rows:
       image_id = r["image_id"]
@@ -304,6 +304,7 @@ def make_dataset(
       paths.append(p)
       genders.append(r["male"])
       ages.append(r["age_months"])
+      ids.append(image_id)
       
    if len(missing) > 0:
       logger.warning("%d images not found in %s. examples=%s", len(missing), image_path, missing[:5])
@@ -312,14 +313,32 @@ def make_dataset(
    path_ds = tf.data.Dataset.from_tensor_slices(np.array(paths))
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
-   dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds))
+   id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
+   dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds, id_ds))
    
    is_train = split == "train"
    if is_train:
       dataset = dataset.shuffle(buffer_size=shuffle_buffer, reshuffle_each_iteration=True)
    
-   def load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
-      """ Loads and preprocesses a single image and its label."""
+   def load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
+      """
+      Loads and preprocesses a single image and its label.
+
+      Args:
+         path (tf.Tensor): tf.string file path to image.
+         gender (tf.Tensor): tf.int32 scalar {0,1}.
+         age (tf.Tensor): tf.float32 scalar (months).
+         img_id (tf.Tensor): tf.string scalar, numeric ID from CSV (e.g., "4516").
+
+      Returns:
+         (features, label):
+            features = {
+               "image":  tf.float32 [H,W,1],
+               "gender": tf.int32   [],
+               "image_id": tf.string []
+            }
+            label = tf.float32 []  # age in months
+      """
       image = read_image_grayscale(path)  # [H,W,1], float32 in [0,1]
       
       if keep_aspect_ratio:
@@ -334,7 +353,11 @@ def make_dataset(
       if is_train and augment:
          image = augment_image(image)  # data augmentation
          
-      features = {"image": image, "gender": tf.cast(gender, tf.int32)}
+      features = {
+         "image": image, 
+         "gender": tf.cast(gender, tf.int32),
+         "image_id": img_id
+      }
       return features, tf.cast(age, tf.float32)
    
    dataset = dataset.map(load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
