@@ -9,7 +9,7 @@ output, and activates it with ReLU to keep feature maps stable and expressive.
 
 from typing import Tuple
 import tensorflow as tf
-from tensorflow.keras import layers, Tensor
+from tensorflow.keras import layers
 
 def conv_bn_relu(x: tf.Tensor, filters:int, k_size:int = 3, s:int = 1) -> tf.Tensor:
    """
@@ -29,4 +29,3 @@ def conv_bn_relu(x: tf.Tensor, filters:int, k_size:int = 3, s:int = 1) -> tf.Ten
    x = layers.BatchNormalization()(x)
    x = layers.ReLU()(x)
    return x
-
