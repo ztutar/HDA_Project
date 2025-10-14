@@ -26,6 +26,11 @@ dev = [
     "pytest",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "smoke: lightweight end-to-end checks"
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

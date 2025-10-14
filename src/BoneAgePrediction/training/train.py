@@ -86,6 +86,15 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
       cache=cache,
    )
    logger.info("Prepared training and validation datasets from %s", data_path)
+
+   def _select_image(features, label):
+      return features["image"], label
+
+   train_ds = train_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
+   train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
+
+   val_ds = val_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
+   val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
    
    # -----------------------
    # Model
@@ -180,7 +189,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    # -----------------------
    num_params = count_params(model)
    gmacs = estimate_gmacs(model, input_shape)
-   epoch_times = epoch_timer.times
+   epoch_times = epoch_timer.epoch_times
    avg_epoch_time = np.mean(epoch_times) if epoch_times else None
    print(f"[{model_name}] Number of Params: {num_params:,} | GMACs(est): {gmacs:.3f} | Avg epoch time: {avg_epoch_time:.2f}s")
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"

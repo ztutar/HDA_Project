@@ -26,7 +26,7 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
       List[tf.keras.callbacks.Callback]: List of callbacks to pass into model.fit().
    """
    os.makedirs(save_dir, exist_ok=True)
-   checkpoint_path = os.path.join(save_dir, f"{model_name}_best.ckpt")
+   checkpoint_path = os.path.join(save_dir, f"{model_name}_best.keras")
    tb_logs_path = os.path.join(save_dir, f"{model_name}_tensorboard_logs")
    
    checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(

@@ -69,53 +69,97 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
       - BatchNorm/ReLU/Pooling operations are approximated as 1 MAC per output element.
    """
    if not model.built:
-      model(tf.keras.Input(shape=input_shape), training=False)
+      model.build((None, *input_shape))
    
    total_macs = 0.0
    
    # Run one dummy forward pass to initialize layer shapes (so input/output_shape are defined for MACs).
-   _ = model(tf.random.uniform((1, *input_shape), dtype=tf.float32), training=False)
+   dummy_inputs = tf.random.uniform((1, *input_shape), dtype=tf.float32)
+   model_feed: tf.Tensor | Dict[str, tf.Tensor]
+   input_names = getattr(model, "input_names", None)
+   if input_names and len(input_names) == 1:
+      model_feed = {input_names[0]: dummy_inputs}
+   else:
+      model_feed = dummy_inputs
+   _ = model(model_feed, training=False)
    logger.debug("Initialized model %s for GMAC estimation using input_shape=%s", getattr(model, "name", "<unnamed>"), input_shape)
-   
+
+   def _tensor_shape(shape):
+      if shape is None:
+         return None
+      if isinstance(shape, list):
+         shape = shape[0]
+      return tf.TensorShape(shape)
+
+   def _layer_output_shape(layer):
+      output_shape = getattr(layer, "output_shape", None)
+      output_shape = _tensor_shape(output_shape)
+      if output_shape is not None:
+         return output_shape
+      try:
+         inferred = layer.compute_output_shape(getattr(layer, "input_shape", None))
+      except Exception:
+         return None
+      return _tensor_shape(inferred)
+
    for layer in model.layers:
       # --- Convolutional layers ---
       if isinstance(layer, tf.keras.layers.Conv2D):
-         output_shape = layer.output_shape if not isinstance(layer.output_shape, list) else layer.output_shape[0]
+         output_shape = _layer_output_shape(layer)
+         if output_shape is None:
+            continue
          H_out, W_out, C_out = int(output_shape[1]), int(output_shape[2]), int(output_shape[3])
-         K_in = int(layer.input_shape[-1])
-         K_h, K_w = int(layer.kernel_size[0]), int(layer.kernel_size[1])
+         kernel = getattr(layer, "kernel", None)
+         if kernel is None:
+            continue
+         kernel_shape = kernel.shape
+         K_h, K_w = int(kernel_shape[0]), int(kernel_shape[1])
+         K_in = int(kernel_shape[2])
          conv_macs = H_out * W_out * C_out * (K_h * K_w * K_in)
          total_macs += conv_macs
-   
+
       # --- Dense (Fully Connected) layers ---
       elif isinstance(layer, tf.keras.layers.Dense):
-         units_in = int(layer.input_shape[-1])
-         units_out = int(layer.output_shape[-1])
+         kernel = getattr(layer, "kernel", None)
+         if kernel is None:
+            continue
+         kernel_shape = kernel.shape
+         units_in = int(kernel_shape[0])
+         output_shape = _layer_output_shape(layer)
+         if output_shape is None:
+            continue
+         units_out = int(kernel_shape[1] if len(kernel_shape) > 1 else output_shape[-1])
          dense_macs = units_in * units_out
          total_macs += dense_macs
-      
+
       # --- Batch Normalization ---
       elif isinstance(layer, tf.keras.layers.BatchNormalization):
          # 2 MACs per output element (normalize and scale)
-         output_shape = layer.output_shape if not isinstance(layer.output_shape, list) else layer.output_shape[0]
+         output_shape = _layer_output_shape(layer)
+         if output_shape is None:
+            continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          bn_macs = 2 * elements
          total_macs += bn_macs
-      
+
       # --- Activation functions (ReLU, etc.) ---
       elif isinstance(layer, tf.keras.layers.ReLU) or isinstance(layer, tf.keras.layers.Activation):
          # 1 MAC per output element (comparison)
-         output_shape = layer.output_shape if not isinstance(layer.output_shape, list) else layer.output_shape[0]
+         output_shape = _layer_output_shape(layer)
+         if output_shape is None:
+            continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          activation_macs = elements
          total_macs += activation_macs
-      
+
       # --- Pooling layers (Max/Avg) ---
       elif isinstance(layer, (tf.keras.layers.MaxPooling2D, 
                               tf.keras.layers.AveragePooling2D, 
                               tf.keras.layers.GlobalAveragePooling2D)):
          # 1 MAC per output element (sum/avg)
-         output_shape = layer.output_shape if not isinstance(layer.output_shape, list) else layer.output_shape[0]
+         output_shape = _layer_output_shape(layer)
+         if output_shape is None:
+            continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          pooling_macs = elements 
          total_macs += pooling_macs
@@ -139,7 +183,7 @@ class EpochTimer(tf.keras.callbacks.Callback):
    """
    def __init__(self) -> None:
       super().__init__()
-      self.epoch_times = []
+      self.epoch_times: list[float] = []
       self.t0 = 0.0
       
    def on_train_begin(self, logs=None) -> None:
