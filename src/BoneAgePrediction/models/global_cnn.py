@@ -6,7 +6,7 @@ stacked convolutional blocks that perform feature extraction, followed by a
 global pooling layer that condenses the spatial information into one vector,
 and a pair of dense layers that map the extracted features to the final output.
 
-The `build_global_cnn` function is the main entry point. It lets callers
+The `build_GlobalCNN` function is the main entry point. It lets callers
 select the input shape, how many convolutional blocks to use, how many filters
 each block should contain, and the size of the dense layer before the output.
 Internally it relies on the shared `conv_bn_relu` helper from
@@ -17,7 +17,7 @@ that can be reused for different experiments with minimal changes.
 
 from typing import Sequence, Tuple
 import tensorflow as tf
-from tensorflow.keras import layers, Model
+from keras import layers, Model
 from BoneAgePrediction.models.base_blocks import conv_bn_relu
 
 def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
