@@ -147,7 +147,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
       loss=loss_fn,
       metrics=[mae(), rmse()],
    )
-   logger.info("Model compiled with loss %s", loss_name)
+   logger.info("Model compiled with %s loss", loss_name)
    
    # -----------------------
    # Callbacks
@@ -165,7 +165,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    )
    epoch_timer = EpochTimer()
    callbacks.append(epoch_timer)
-   logger.info("Configured training callbacks with patience %d", patience)
+   logger.info("Configured training callbacks with patience: %d", patience)
    
    # -----------------------
    # Train
@@ -191,8 +191,9 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    print(f"[{model_name}] Number of Params: {num_params:,} | GMACs(est): {gmacs:.3f} | Avg epoch time: {avg_epoch_time:.2f}s")
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
    logger.info(
-      f"[{model_name}] Params: %s | GMACs(est): %.3f | Avg epoch time: %ss",
-      f"{num_params:,}",
+      "[%s] Params: %d | GMACs(est): %.3f | Avg epoch time: %s s",
+      model_name,
+      num_params,
       gmacs,
       avg_time_display,
    )

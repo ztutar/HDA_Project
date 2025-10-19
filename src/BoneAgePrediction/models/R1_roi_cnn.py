@@ -7,7 +7,7 @@ def build_ROI_CNN(
    channels: Sequence[int] = [32, 64],
    dense_units: int = 32,
    use_gender: bool = False,
-   name: str = 'R1_ROIOnly_CNN'
+   name: str = 'R1_ROI_CNN'
 ) -> tf.keras.Model:
    """
    Build the ROI-only model with two inputs (carpal, metacarpal/phalange).
