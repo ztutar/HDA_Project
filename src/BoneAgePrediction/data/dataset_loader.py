@@ -260,8 +260,6 @@ def make_dataset(
    keep_aspect_ratio=True, 
    pad_value=0.0,
    batch_size: int = 16,
-   shuffle_buffer: int = 1024,
-   num_workers: int = 4,
    clahe: bool = False,
    augment: bool = True,
    cache: bool = True,
@@ -276,8 +274,6 @@ def make_dataset(
       keep_aspect_ratio (bool): Whether to keep aspect ratio when resizing.
       pad_value (float): Padding value when resizing with aspect ratio.
       batch_size (int): Batch size.
-      shuffle_buffer (int): Buffer size for shuffling.
-      num_workers (int): Number of parallel calls for data loading and processing.
       clahe (bool): Whether to apply CLAHE preprocessing.
       augment (bool): Whether to apply data augmentation (only for 'train' split).
       cache (bool): Whether to cache the dataset in memory.
@@ -315,11 +311,7 @@ def make_dataset(
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
    dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds, id_ds))
-   
-   is_train = split == "train"
-   if is_train:
-      dataset = dataset.shuffle(buffer_size=shuffle_buffer, reshuffle_each_iteration=True)
-   
+      
    def _load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
       Loads and preprocesses a single image and its label.
@@ -349,7 +341,8 @@ def make_dataset(
       if clahe:
          image = apply_clahe(image)  # CLAHE preprocessing
       image = zscore_norm(image)  # z-score normalization
-      
+
+      is_train = split == "train"
       if is_train and augment:
          image = augment_image(image)  # data augmentation
          
@@ -363,7 +356,7 @@ def make_dataset(
    dataset = dataset.map(_load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
    if cache:
       dataset = dataset.cache()
-   dataset = dataset.batch(batch_size, drop_remainder=False)
+   dataset = dataset.batch(batch_size, drop_remainder=False, num_parallel_calls=tf.data.AUTOTUNE)
    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
    return dataset
 
@@ -373,7 +366,6 @@ def make_roi_dataset(
    roi_path: str,
    split: str = "train",
    batch_size: int = 16,
-   shuffle_buffer:int = 1024,
    cache: bool = True,
 ) -> tf.data.Dataset:
    """
@@ -385,7 +377,6 @@ def make_roi_dataset(
       roi_path (str): Base dir with saved crops: {roi_root}/{split}/{carpal,metaph}/*.png
       split (str): 'train' | 'validation' | 'test'
       batch_size (int): Batch size.
-      shuffle_buffer (int): Buffer size for shuffling.
       cache (bool): Cache dataset in memory.
 
    Returns:
@@ -428,12 +419,8 @@ def make_roi_dataset(
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
-   dataset = tf.data.Dataset.zip((carpal_paths, metaph_paths, gender_ds, age_ds, id_ds))
-   
-   is_train = split == "train"
-   if is_train:
-      dataset = dataset.shuffle(buffer_size=shuffle_buffer, reshuffle_each_iteration=True)
-   
+   dataset = tf.data.Dataset.zip((carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds))
+      
    def _load_pair(carpal_path: tf.Tensor, metaph_path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
       Loads and preprocesses a single image and its label.

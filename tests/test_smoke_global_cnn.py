@@ -15,7 +15,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from BoneAgePrediction.training import train as train_module
+from BoneAgePrediction.training import train_B0 as train_module
 
 
 def _write_minimal_config(tmp_path: Path) -> Path:

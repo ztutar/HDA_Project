@@ -1,6 +1,6 @@
 from typing import Optional
 import argparse
-from BoneAgePrediction.training.train import train_GlobalCNN
+from BoneAgePrediction.training.train_B0 import train_GlobalCNN
 from BoneAgePrediction.utils.logger import get_logger
 
 def main(model_name: str, config_path: Optional[str]) -> None:

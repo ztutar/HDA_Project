@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 from BoneAgePrediction.data.dataset_loader import make_dataset
-from BoneAgePrediction.models.global_cnn import build_GlobalCNN
+from BoneAgePrediction.models.B0_global_cnn import build_GlobalCNN
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse
 from BoneAgePrediction.visualization.gradcam import compute_GradCAM
@@ -34,38 +34,50 @@ def train_locator_and_save_rois(
       {out_root}/{split}/roi_coords.csv    # (image_id, y0,x0,y1,x1 for both ROIs)
    """
    # --- 1) Datasets for ROI locator
-   config_data = config["data"]
+   data_cfg = config.data
+   roi_cfg = config.roi
+   locator_cfg = roi_cfg.locator
+   extractor_cfg = roi_cfg.extractor
+   
+   data_path = data_cfg.data_path
+   target_h = data_cfg.target_h
+   target_w = data_cfg.target_w
+   keep_aspect_ratio = data_cfg.keep_aspect_ratio
+   pad_value = data_cfg.pad_value
+   batch_size = data_cfg.batch_size
+   clahe = data_cfg.clahe
+   augment = data_cfg.augment
+   cache = data_cfg.cache
+   
    ds = make_dataset(
-      data_path=config_data.data["data_path"], 
-      split=split,
-      target_h=config_data["target_h"], 
-      target_w=config_data["target_w"],
-      keep_aspect_ratio=config_data["keep_aspect_ratio"], 
-      pad_value=config_data["pad_value"],
-      batch_size=config_data["batch_size"], 
-      shuffle_buffer=config_data["shuffle_buffer"],
-      num_workers=config_data["num_workers"], 
-      clahe=config_data["clahe"],
-      augment=config_data["augment"] if split == "train" else False,
-      cache=config_data["cache"]
+      data_path = data_path, 
+      split = split,
+      target_h = target_h, 
+      target_w = target_w,
+      keep_aspect_ratio = keep_aspect_ratio, 
+      pad_value = pad_value,
+      batch_size = batch_size, 
+      clahe = clahe,
+      augment = augment if split == "train" else False,
+      cache = cache
    )
 
    # --- 2) ROI Locator model (CNN)
-   input_shape = (config["target_h"], config["target_w"], 1)
-   config_loc = config["roi"]["locator"]
+   input_shape = (target_h, target_w, 1)
+   
    roi_loc_model = build_GlobalCNN(
-      input_shape=input_shape,
-      num_blocks=config_loc["num_blocks"],
-      channels=tuple(config_loc["channels"]),
-      dense_units=config_loc["dense_units"],
+      input_shape = input_shape,
+      num_blocks = locator_cfg.num_blocks,
+      channels = tuple(locator_cfg.channels),
+      dense_units = locator_cfg.dense_units,
       name="ROI_Locator_CNN",
    )
-   optimizer = tf.keras.optimizers.Adam(learning_rate=config_loc["learning_rate"])
+   optimizer = tf.keras.optimizers.Adam(learning_rate=locator_cfg.learning_rate)
    roi_loc_model.compile(optimizer=optimizer, loss=get_loss("huber", 10.0), metrics=[mae(), rmse()])
 
    if split == "train":
       # quick fit to give CAM a sensible signal
-      roi_loc_model.fit(ds, epochs=config_loc["epochs"], verbose=1)
+      roi_loc_model.fit(ds, epochs=locator_cfg.epochs, verbose=1)
    else:
       # For val/test, just do 1 pass to initialize weights structure (optional).
       _ = roi_loc_model.predict(ds.take(1), verbose=0)
@@ -95,14 +107,13 @@ def train_locator_and_save_rois(
          # Compute Grad-CAM on the locator
          cam = compute_GradCAM(roi_loc_model, image, target_layer_name=None)  # [H,W] in [0,1]
 
-         config_ext = config["roi"]["extractor"] 
          rois = extract_rois_from_heatmap(
                heatmap=cam,
                image=image,
-               roi_size=config_ext["roi_size"],
-               carpal_margin=config_ext["carpal_margin"],
-               meta_mask_radius=config_ext["meta_mask_radius"],
-               heatmap_threshold=config_ext["heatmap_threshold"],
+               roi_size=extractor_cfg.roi_size,
+               carpal_margin=extractor_cfg.carpal_margin,
+               meta_mask_radius=extractor_cfg.meta_mask_radius,
+               heatmap_threshold=extractor_cfg.heatmap_threshold,
          )
          # --- Use the true image_id from CSV (e.g., "4516")
          img_id = image_id.numpy().decode("utf-8")
