@@ -53,7 +53,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
    config_filename = os.path.basename(config_path) if config_path else "default"
    config_dict = asdict(config_bundle)
    config_params = json.dumps(config_bundle.raw, sort_keys=True)
-   model_name = "R1_ROIOnly_CNN"
+   model_name = "R1_ROI_CNN"
    logger.info(f"Starting {model_name} training using config %s", config_filename)
    logger.debug("Configuration parameters: %s", config_dict)
 
@@ -92,7 +92,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
       roi_path = roi_path,
       split = 'train',
       batch_size = batch_size,
-      shuffle_buffer = shuffle_buffer,
       cache = cache,
    )
    
@@ -101,40 +100,34 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
       roi_path = roi_path,
       split = 'validation',
       batch_size = batch_size,
-      shuffle_buffer = shuffle_buffer,
       cache = cache,
    )
-   logger.info("Prepared training and validation datasets from %s", data_path)
-
-   def _select_image(features, label):
-      return features["image"], label
-
-   train_ds = train_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
-   train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
-
-   val_ds = val_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
-   val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
+   logger.info("Prepared training and validation ROI datasets from %s", data_path)
+   
+   # Deduce ROI shape from one batch
+   sample_batch = next(iter(train_ds.take(1)))
+   roi_shape = tuple(sample_batch[0]["carpal"].shape[1:]) # [H, W, 1]
    
    # -----------------------
    # Model
    # -----------------------
    channels = model_cfg.channels
-   num_blocks = model_cfg.num_blocks
    dense_units = model_cfg.dense_units
-   input_shape = (target_h, target_w, 1)  # grayscale input
+   use_gender = model_cfg.use_gender
    
-   model = build_GlobalCNN(
-      input_shape=input_shape,
-      num_blocks=num_blocks,
+   model = build_ROI_CNN(
+      roi_shape=roi_shape,
       channels=channels,
       dense_units=dense_units,
+      use_gender=use_gender,
    )
+   
    logger.info(
-      "%s architecture: %d blocks, channels=%s, dense_units=%d",
+      "%s architecture: roi_shape=%s, channels=%s, dense_units=%d, use_gender=%s",
       model_name,
-      num_blocks,
       channels,
       dense_units,
+      use_gender,
    )
    
    # -----------------------
@@ -169,7 +162,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
       loss=loss_fn,
       metrics=[mae(), rmse()],
    )
-   logger.info("Model compiled with loss %s", loss_name)
+   logger.info("Model compiled with %s loss", loss_name)
    
    # -----------------------
    # Callbacks
@@ -187,7 +180,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
    )
    epoch_timer = EpochTimer()
    callbacks.append(epoch_timer)
-   logger.info("Configured training callbacks with patience %d", patience)
+   logger.info("Configured training callbacks with patience: %d", patience)
    
    # -----------------------
    # Train
@@ -207,14 +200,15 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
    # Complexity & Timing
    # -----------------------
    num_params = count_params(model)
-   gmacs = estimate_gmacs(model, input_shape)
+   gmacs = estimate_gmacs(model, roi_shape)
    epoch_times = epoch_timer.epoch_times
    avg_epoch_time = np.mean(epoch_times) if epoch_times else None
    print(f"[{model_name}] Number of Params: {num_params:,} | GMACs(est): {gmacs:.3f} | Avg epoch time: {avg_epoch_time:.2f}s")
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
    logger.info(
-      f"[{model_name}] Params: %s | GMACs(est): %.3f | Avg epoch time: %ss",
-      f"{num_params:,}",
+      "[%s] Params: %d | GMACs(est): %.3f | Avg epoch time: %s s",
+      model_name,
+      num_params,
       gmacs,
       avg_time_display,
    )

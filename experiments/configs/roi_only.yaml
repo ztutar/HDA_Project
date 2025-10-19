@@ -27,7 +27,6 @@ roi:
 
 # ---------- ROI regressors (R1) ----------
 model:
-  num_blocks: 3
   channels: [32, 64, 128]
   dense_units: 64
   use_gender: false
