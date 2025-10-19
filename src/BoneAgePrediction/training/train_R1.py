@@ -84,7 +84,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
    # -----------------------
    data_path = data_cfg.data_path
    batch_size = data_cfg.batch_size
-   shuffle_buffer = data_cfg.shuffle_buffer
    cache = data_cfg.cache
    
    train_ds = make_roi_dataset(
@@ -103,6 +102,20 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
       cache = cache,
    )
    logger.info("Prepared training and validation ROI datasets from %s", data_path)
+
+   def _select_model_inputs(features, label):
+      inputs = {
+         "carpal": features["carpal"],
+         "metaph": features["metaph"],
+      }
+      if model_cfg.use_gender:
+         inputs["gender"] = tf.cast(features["gender"], tf.int32)
+      return inputs, label
+
+   train_ds = train_ds.map(_select_model_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   val_ds = val_ds.map(_select_model_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+   val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
    
    # Deduce ROI shape from one batch
    sample_batch = next(iter(train_ds.take(1)))

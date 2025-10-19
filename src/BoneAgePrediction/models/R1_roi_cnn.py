@@ -7,7 +7,7 @@ def build_ROI_CNN(
    channels: Sequence[int] = [32, 64],
    dense_units: int = 32,
    use_gender: bool = False,
-   name: str = 'R1_ROI_CNN'
+   name: str = "R1_ROI_CNN",
 ) -> tf.keras.Model:
    """
    Build the ROI-only model with two inputs (carpal, metacarpal/phalange).
@@ -26,24 +26,25 @@ def build_ROI_CNN(
                   Output: [B,1] age (months)  
    """
    
-   inp_carp = layers.Input(shape=roi_shape, name='carpal')
-   inp_metp = layers.Input(shape=roi_shape, name='metaph')
-   inp_gender = layers.Input(shape=(), dtype=tf.int32, name='gender') if use_gender else None
-   
+   inp_carp = layers.Input(shape=roi_shape, name="carpal")
+   inp_metp = layers.Input(shape=roi_shape, name="metaph")
+   inputs = {"carpal": inp_carp, "metaph": inp_metp}
+
    feat_carp = ROI_CNN_head(inp_carp, channels, dense_units)
    feat_metp = ROI_CNN_head(inp_metp, channels, dense_units)
-   
+
    features = layers.Concatenate()([feat_carp, feat_metp])
    if use_gender:
+      inp_gender = layers.Input(shape=(), dtype=tf.int32, name="gender")
       gender_emb = layers.Embedding(input_dim=2, output_dim=16)(inp_gender)
       gender_emb = layers.Flatten()(gender_emb)
       features = layers.Concatenate()([features, gender_emb])
-   
-   x = layers.Dense(max(64, dense_units*2), activation='relu')(features)
-   output_age = layers.Dense(1, activation='linear', name='age_months')(x)
-   
-   model = Model(inputs={"carpal":inp_carp, "metaph":inp_metp, "gender":inp_gender}, 
-                  outputs=output_age, name=name)
+      inputs["gender"] = inp_gender
+
+   x = layers.Dense(max(64, dense_units * 2), activation="relu")(features)
+   output_age = layers.Dense(1, activation="linear", name="age_months")(x)
+
+   model = Model(inputs=inputs, outputs=output_age, name=name)
    
    return model
 

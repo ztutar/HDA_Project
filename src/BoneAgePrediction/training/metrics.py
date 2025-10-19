@@ -74,13 +74,26 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
    total_macs = 0.0
    
    # Run one dummy forward pass to initialize layer shapes (so input/output_shape are defined for MACs).
-   dummy_inputs = tf.random.uniform((1, *input_shape), dtype=tf.float32)
-   model_feed: tf.Tensor | Dict[str, tf.Tensor]
-   input_names = getattr(model, "input_names", None)
-   if input_names and len(input_names) == 1:
-      model_feed = {input_names[0]: dummy_inputs}
+   def _random_like(tensor_shape: tf.TensorShape) -> tf.Tensor:
+      dims = [1 if dim is None else int(dim) for dim in tensor_shape]
+      if not dims:
+         dims = [1]
+      return tf.random.uniform((1, *dims), dtype=tf.float32)
+
+   def _tensor_key(tensor: tf.Tensor, index: int) -> str:
+      name = getattr(tensor, "name", None)
+      if not name:
+         return f"input_{index}"
+      return name.split(":")[0]
+
+   input_tensors = model.inputs if isinstance(model.inputs, (list, tuple)) else [model.inputs]
+   if len(input_tensors) > 1:
+      model_feed = {}
+      for idx, tensor in enumerate(input_tensors):
+         key = _tensor_key(tensor, idx)
+         model_feed[key] = _random_like(tf.TensorShape(tensor.shape)[1:])
    else:
-      model_feed = dummy_inputs
+      model_feed = _random_like(tf.TensorShape(input_tensors[0].shape)[1:])
    _ = model(model_feed, training=False)
    logger.debug("Initialized model %s for GMAC estimation using input_shape=%s", getattr(model, "name", "<unnamed>"), input_shape)
 
