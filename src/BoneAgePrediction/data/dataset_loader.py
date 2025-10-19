@@ -63,7 +63,7 @@ def build_id_to_path(image_dir: str) -> Dict[str, str]:
    Args:
       image_dir (str): Directory containing images.
    Returns:
-      Dict[str, str]: Mapping from image ID to file path.
+      id_to_path (Dict[str, str]): Mapping from image ID to file path.
    """
    pattern = os.path.join(image_dir, "*.png")
    logger = get_logger(__name__)
@@ -320,7 +320,7 @@ def make_dataset(
    if is_train:
       dataset = dataset.shuffle(buffer_size=shuffle_buffer, reshuffle_each_iteration=True)
    
-   def load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
+   def _load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
       Loads and preprocesses a single image and its label.
 
@@ -360,7 +360,112 @@ def make_dataset(
       }
       return features, tf.cast(age, tf.float32)
    
-   dataset = dataset.map(load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+   dataset = dataset.map(_load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+   if cache:
+      dataset = dataset.cache()
+   dataset = dataset.batch(batch_size, drop_remainder=False)
+   dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+   return dataset
+
+# ---------- ROI Dataset loader (load saved crops) ----------
+def make_roi_dataset(
+   data_path: str,
+   roi_path: str,
+   split: str = "train",
+   batch_size: int = 16,
+   shuffle_buffer:int = 1024,
+   cache: bool = True,
+) -> tf.data.Dataset:
+   """
+   Build a tf.data pipeline yielding paired ROI crops and labels:
+   ({"carpal": img, "metaph": img, "gender": int32}, age_months)
+
+   Args:
+      data_path (str): Root directory containing 'images/' and 'labels.csv'.
+      roi_path (str): Base dir with saved crops: {roi_root}/{split}/{carpal,metaph}/*.png
+      split (str): 'train' | 'validation' | 'test'
+      batch_size (int): Batch size.
+      shuffle_buffer (int): Buffer size for shuffling.
+      cache (bool): Cache dataset in memory.
+
+   Returns:
+      tf.data.Dataset: Batches of paired crops and labels.
+   """
+   split = {"train": "train", "val": "validation", "validation":"validation", "test": "test"}[split.lower()]
+   carpal_dir = os.path.join(roi_path, split, "carpal")
+   metaph_dir = os.path.join(roi_path, split, "metaph")
+   coords_csv = os.path.join(roi_path, split, "roi_coords.csv")
+   
+   # Expect original labels CSV from data_path
+   labels_csv = os.path.join(data_path, f"{split}.csv")
+   rows = read_csv_labels(labels_csv)
+   
+   # Build id -> path maps
+   carpal_map = build_id_to_path(carpal_dir)
+   metaph_map = build_id_to_path(metaph_dir)
+   
+   carpal_paths, metaph_paths, genders, ages, ids = [], [], [], [], []
+   missing = []
+   for r in rows:
+      image_id = r["image_id"]
+      carp = carpal_map.get(image_id, None)
+      metp = metaph_map.get(image_id, None)
+      
+      if carp or metp is None:
+         missing.append(image_id)
+         continue
+      
+      carpal_paths.append(carp)
+      metaph_paths.append(metp)
+      genders.append(r["male"])
+      ages.append(r["age_months"])
+      ids.append(image_id)
+      
+   # TODO: add "if len(missing) > 0:" logger here
+   
+   carpal_path_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_paths))   
+   metaph_path_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_paths))
+   gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
+   age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
+   id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
+   dataset = tf.data.Dataset.zip((carpal_paths, metaph_paths, gender_ds, age_ds, id_ds))
+   
+   is_train = split == "train"
+   if is_train:
+      dataset = dataset.shuffle(buffer_size=shuffle_buffer, reshuffle_each_iteration=True)
+   
+   def _load_pair(carpal_path: tf.Tensor, metaph_path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
+      """
+      Loads and preprocesses a single image and its label.
+
+      Args:
+         carpal_path (tf.Tensor): tf.string file path to cropped carpal image.
+         metaph_path (tf.Tensor): tf.string file path to cropped metaphalange image.
+         gender (tf.Tensor): tf.int32 scalar {0,1}.
+         age (tf.Tensor): tf.float32 scalar (months).
+         img_id (tf.Tensor): tf.string scalar, numeric ID from CSV (e.g., "4516").
+
+      Returns:
+         (features, label):
+            features = {
+               "image":  tf.float32 [H,W,1],
+               "gender": tf.int32   [],
+               "image_id": tf.string []
+            }
+            label = tf.float32 []  # age in months
+      """
+      c_img = zscore_norm(read_image_grayscale(carpal_path))  # [H,W,1], float32 in [0,1], z-score normalized
+      m_img = zscore_norm(read_image_grayscale(metaph_path))
+         
+      features = {
+         "carpal": c_img, 
+         "metaph": m_img,
+         "gender": tf.cast(gender, tf.int32),
+         "image_id": img_id
+      }
+      return features, tf.cast(age, tf.float32)
+   
+   dataset = dataset.map(_load_pair, num_parallel_calls=tf.data.AUTOTUNE)
    if cache:
       dataset = dataset.cache()
    dataset = dataset.batch(batch_size, drop_remainder=False)

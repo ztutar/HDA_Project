@@ -2,11 +2,12 @@
 """Utilities for loading project configuration for data processing workflows.
 
 The project now organises experiment configuration files into top-level
-sections such as ``data:``, ``model:``, and ``training:``.  This module defines
-lightweight dataclasses for the supported sections and provides helpers to load
-them from YAML/JSON files.  The main entry point, :func:`load_config`, returns a
-``ProjectConfig`` bundle that exposes the parsed dataclasses while keeping the
-raw mapping available for callers that need direct access to other keys.
+sections such as ``data:``, ``roi:``, ``model:``, and ``training:``.  This
+module defines lightweight dataclasses for the supported sections and provides
+helpers to load them from YAML/JSON files.  The main entry point,
+:func:`load_config`, returns a ``ProjectConfig`` bundle that exposes the parsed
+dataclasses while keeping the raw mapping available for callers that need
+direct access to other keys.
 """
 
 from dataclasses import dataclass, field, fields
@@ -55,6 +56,7 @@ class ModelConfig:
    num_blocks: int = 3
    channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    dense_units: int = 64
+   use_gender: bool = False
 
 @dataclass
 class OptimizerConfig:
@@ -74,8 +76,31 @@ class TrainingConfig:
    optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
 
 @dataclass
+class ROILocatorConfig:
+   roi_path: str = "data/processed/cropped_rois"
+   num_blocks: int = 3
+   channels: list[int] = field(default_factory=lambda: [32, 64, 128])
+   dense_units: int = 64
+   epochs: int = 10
+   learning_rate: float = 5e-4
+
+@dataclass
+class ROIExtractorConfig:
+   roi_size: int = 256
+   carpal_margin: float = 0.12
+   meta_mask_radius: float = 0.18
+   heatmap_threshold: float = 0.4
+   save_heatmaps: bool = False
+
+@dataclass
+class ROIConfig:
+   locator: ROILocatorConfig = field(default_factory=ROILocatorConfig)
+   extractor: ROIExtractorConfig = field(default_factory=ROIExtractorConfig)
+
+@dataclass
 class ProjectConfig:
    data: DataConfig
+   roi: ROIConfig
    model: ModelConfig
    training: TrainingConfig
    raw: Dict[str, Any]
@@ -155,6 +180,7 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
       logger.info("No config path provided; using defaults.")
       return ProjectConfig(
          data=DataConfig(),
+         roi=ROIConfig(),
          model=ModelConfig(),
          training=TrainingConfig(),
          raw={},
@@ -178,6 +204,7 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
       raise ValueError(f"Configuration at {path_obj} must be a mapping.")
 
    data_section = _ensure_mapping(config_dict.get("data", {}), "data", path_obj)
+   roi_section = _ensure_mapping(config_dict.get("roi", {}), "roi", path_obj)
    model_section = _ensure_mapping(config_dict.get("model", {}), "model", path_obj)
    training_section = _ensure_mapping(config_dict.get("training", {}), "training", path_obj)
 
@@ -200,6 +227,29 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
       )
    )
 
+   roi_locator_section = _ensure_mapping(roi_section.get("locator", {}), "roi.locator", path_obj)
+   roi_extractor_section = _ensure_mapping(roi_section.get("extractor", {}), "roi.extractor", path_obj)
+
+   roi_locator_config = ROILocatorConfig(
+      **_filter_known_fields(
+         roi_locator_section,
+         ROILocatorConfig,
+         "roi.locator",
+         logger,
+         path_obj,
+      )
+   )
+   roi_extractor_config = ROIExtractorConfig(
+      **_filter_known_fields(
+         roi_extractor_section,
+         ROIExtractorConfig,
+         "roi.extractor",
+         logger,
+         path_obj,
+      )
+   )
+   roi_config = ROIConfig(locator=roi_locator_config, extractor=roi_extractor_config)
+
    # Remove the optimizer section before filtering training keys to avoid redundant warnings.
    training_section_without_optimizer = {
       key: value for key, value in training_section.items() if key != "optimizer"
@@ -211,6 +261,7 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
 
    return ProjectConfig(
       data=data_config,
+      roi=roi_config,
       model=model_config,
       training=training_config,
       raw=config_dict,
