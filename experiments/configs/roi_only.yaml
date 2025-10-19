@@ -21,7 +21,7 @@ roi:
     epochs: 10
     learning_rate: 0.0005
   extractor:
-    roi_size: 224            # saved crop size (square)
+    roi_size: 256            # saved crop size (square)
     carpal_margin: 0.12      # extra border around peak box (fraction of shorter side)
     meta_mask_radius: 0.18   # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
     heatmap_threshold: 0.4   # minimal normalized CAM value to accept a peak
