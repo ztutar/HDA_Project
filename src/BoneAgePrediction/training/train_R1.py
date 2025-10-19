@@ -1,9 +1,8 @@
 #TODO: add docstring explanation for this module. write in details and explain each function
 
 
-from typing import Tuple
+from typing import Tuple, Dict
 from dataclasses import asdict
-import logging
 import os
 import csv
 import json
@@ -14,76 +13,96 @@ from BoneAgePrediction.utils.logger import get_logger
 from BoneAgePrediction.utils.seeds import set_seeds
 from BoneAgePrediction.utils.config import load_config
 from BoneAgePrediction.utils.path_manager import incremental_path
-from BoneAgePrediction.data.dataset_loader import make_dataset
-from BoneAgePrediction.models.global_cnn import build_GlobalCNN
+
+from BoneAgePrediction.data.dataset_loader import make_roi_dataset
+
+from BoneAgePrediction.roi.roi_locator import train_locator_and_save_rois
+
+from BoneAgePrediction.models.R1_roi_cnn import build_ROI_CNN
+
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, estimate_gmacs, EpochTimer
 from BoneAgePrediction.training.callbacks import make_callbacks
 
 logger = get_logger(__name__)
 
-def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
-   #TODO: add dpcstring explanation for this function. write in details and explain each step
+def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
+   #TODO: add docstring explanation for this function. write in details and explain each step
+   """
+   Orchestrate ROI-only training:
+   1) Train a locator and generate ROI crops (if not already present).
+   2) Train R1 ROI-only model on saved crops.
+   """
+   
    
    # -----------------------
    # Config & reproducibility
    # -----------------------
    config_bundle = load_config(config_path)
    data_cfg = config_bundle.data
+   
+   roi_cfg = config_bundle.roi
+   locator_cfg = roi_cfg.locator
+   extractor_cfg = roi_cfg.extractor
+   
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
    optimizer_cfg = training_cfg.optimizer
    set_seeds()
+   
    config_filename = os.path.basename(config_path) if config_path else "default"
    config_dict = asdict(config_bundle)
    config_params = json.dumps(config_bundle.raw, sort_keys=True)
-   model_name = "B0_GlobalCNN"
+   model_name = "R1_ROIOnly_CNN"
    logger.info(f"Starting {model_name} training using config %s", config_filename)
    logger.debug("Configuration parameters: %s", config_dict)
-   
+
+
    # -----------------------
-   # Data
+   # ROI Locator & Extractor
+   # -----------------------
+   roi_path = locator_cfg.roi_path
+   os.makedirs(roi_path, exist_ok=True)
+
+   # Generate crops for each split (train/val/test)
+   for split in ["train", "validation", "test"]:
+      split_dir = os.path.join(roi_path, split)
+      carpal_dir = os.path.join(split_dir, "carpal")
+      metaph_dir = os.path.join(split_dir, "metaph")
+      if not (os.path.exists(carpal_dir) and os.path.exists(metaph_dir)):
+         logger.info(f"[R1] Generating ROIs for {split} ...")
+         train_locator_and_save_rois(
+            config = config_bundle,
+            split = split,
+            out_root = roi_path,
+            save_heatmaps = bool(extractor_cfg.save_heatmaps, False),
+         )
+
+
+   # -----------------------
+   # ROI Datasets
    # -----------------------
    data_path = data_cfg.data_path
-   target_h = data_cfg.target_h
-   target_w = data_cfg.target_w
-   keep_aspect_ratio = data_cfg.keep_aspect_ratio
-   pad_value = data_cfg.pad_value
    batch_size = data_cfg.batch_size
    shuffle_buffer = data_cfg.shuffle_buffer
-   num_workers = data_cfg.num_workers
-   clahe = data_cfg.clahe
-   augment = data_cfg.augment
    cache = data_cfg.cache
    
-   train_ds = make_dataset(
-      data_path=data_path,
-      split='train',
-      target_h=target_h,
-      target_w=target_w,
-      keep_aspect_ratio=keep_aspect_ratio,
-      pad_value=pad_value,
-      batch_size=batch_size,
-      shuffle_buffer=shuffle_buffer,
-      num_workers=num_workers,
-      clahe=clahe,
-      augment=augment,
-      cache=cache,
+   train_ds = make_roi_dataset(
+      data_path = data_path,
+      roi_path = roi_path,
+      split = 'train',
+      batch_size = batch_size,
+      shuffle_buffer = shuffle_buffer,
+      cache = cache,
    )
    
-   val_ds = make_dataset(
-      data_path=data_path,
-      split='val',
-      target_h=target_h,
-      target_w=target_w,
-      keep_aspect_ratio=keep_aspect_ratio,
-      pad_value=pad_value,
-      batch_size=batch_size,
-      shuffle_buffer=shuffle_buffer,
-      num_workers=num_workers,
-      clahe=clahe,
-      augment=False,
-      cache=cache,
+   val_ds = make_roi_dataset(
+      data_path = data_path,
+      roi_path = roi_path,
+      split = 'validation',
+      batch_size = batch_size,
+      shuffle_buffer = shuffle_buffer,
+      cache = cache,
    )
    logger.info("Prepared training and validation datasets from %s", data_path)
 

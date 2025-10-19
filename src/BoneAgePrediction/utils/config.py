@@ -32,8 +32,6 @@ class DataConfig:
       split (str): Data split type ('train', 'val', 'test').
       image_size (int): Size of the images.
       batch_size (int): Batch size for data loading.
-      shuffle_buffer (int): Buffer size for shuffling data.
-      num_workers (int): Number of workers for data loading.
       clahe (bool): Whether to apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
       augment (bool): Whether to apply data augmentation.
       cache (bool): Whether to cache the dataset.
@@ -45,8 +43,6 @@ class DataConfig:
    keep_aspect_ratio: bool = True         # Whether to keep aspect ratio when resizing
    pad_value: float = 0.0                 # Padding value when resizing with aspect ratio
    batch_size: int = 16                   # Default batch size
-   shuffle_buffer: int = 1024             # Default shuffle buffer size
-   num_workers: int = 4                   # Default number of workers for data loading
    clahe: bool = False                    # Whether to apply CLAHE
    augment: bool = False                  # Whether to apply data augmentation
    cache: bool = True                     # Whether to cache the dataset
