@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import numpy as np
 import tensorflow as tf
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from BoneAgePrediction.data import dataset_loader
-from BoneAgePrediction.data.dataset_loader import make_dataset
+from BoneAgePrediction.data.dataset_loader import make_dataset, make_roi_dataset
 from BoneAgePrediction.utils.config import DataConfig, load_config
 
 
@@ -43,13 +44,27 @@ def _collect_config_paths():
     )
 
 
+def _write_dummy_png(path: Path, size: tuple[int, int] = (8, 8)) -> None:
+    """Create a simple grayscale PNG image for ROI dataset smoke tests."""
+    ramp = np.linspace(0, 255, num=size[0] * size[1], dtype=np.uint8).reshape(
+        size[0], size[1]
+    )
+    image = tf.constant(ramp[..., np.newaxis], dtype=tf.uint8)
+    encoded = tf.io.encode_png(image)
+    path.write_bytes(encoded.numpy())
+
+
 @dataclass(frozen=True)
 class ConfigCase:
     path: Path
     config: DataConfig
     batch_size: int
-    shuffle_buffer: int
-    num_workers: int
+    target_h: int
+    target_w: int
+    keep_aspect_ratio: bool
+    pad_value: float
+    clahe: bool
+    augment: bool
     cache: bool
     max_batches: int = 5
 
@@ -57,12 +72,12 @@ class ConfigCase:
         return (
             f"{self.path.stem}"
             f"[split={self.config.split},"
-            f"target={self.config.target_h}x{self.config.target_w},"
-            f"clahe={self.config.clahe},"
-            f"augment={self.config.augment},"
+            f"target={self.target_h}x{self.target_w},"
+            f"keep_ar={self.keep_aspect_ratio},"
+            f"pad={self.pad_value},"
+            f"clahe={self.clahe},"
+            f"augment={self.augment},"
             f"batch_size={self.batch_size},"
-            f"shuffle_buffer={self.shuffle_buffer},"
-            f"num_workers={self.num_workers},"
             f"cache={self.cache},"
             f"num_batches={self.max_batches}]"
         )
@@ -73,15 +88,24 @@ def _load_config_cases():
     for cfg_path in _collect_config_paths():
         cfg_bundle = load_config(str(cfg_path))
         cfg = cfg_bundle.data
-        batch_size = min(8, cfg.batch_size)
-        shuffle_buffer = max(1, min(cfg.shuffle_buffer, 64))
+        batch_size = max(1, min(cfg.batch_size, 8))
+        target_h = max(8, min(cfg.target_h, 256))
+        target_w = max(8, min(cfg.target_w, 256))
+        keep_aspect_ratio = cfg.keep_aspect_ratio
+        pad_value = cfg.pad_value
+        clahe = cfg.clahe
+        augment = cfg.augment if cfg.split.lower() == "train" else False
         cases.append(
             ConfigCase(
                 path=cfg_path,
                 config=cfg,
                 batch_size=batch_size,
-                shuffle_buffer=shuffle_buffer,
-                num_workers=1,
+                target_h=target_h,
+                target_w=target_w,
+                keep_aspect_ratio=keep_aspect_ratio,
+                pad_value=pad_value,
+                clahe=clahe,
+                augment=augment,
                 cache=False,
             )
         )
@@ -111,21 +135,19 @@ def test_dataloader_smoke(case: ConfigCase):
     if not image_dir.exists() or not csv_file.exists():
         pytest.skip(f"Split '{split_name}' not available under {data_root}")
 
-    if cfg.clahe and not dataset_loader._HAS_CV2:
+    if case.clahe and not dataset_loader._HAS_CV2:
         pytest.skip("OpenCV not installed; skipping CLAHE config")
 
     dataset = make_dataset(
         data_path=str(data_root),
         split="train",
-        target_h=cfg.target_h,
-        target_w=cfg.target_w,
-        keep_aspect_ratio=cfg.keep_aspect_ratio,
-        pad_value=cfg.pad_value,
+        target_h=case.target_h,
+        target_w=case.target_w,
+        keep_aspect_ratio=case.keep_aspect_ratio,
+        pad_value=case.pad_value,
         batch_size=case.batch_size,
-        shuffle_buffer=case.shuffle_buffer,
-        num_workers=case.num_workers,
-        clahe=cfg.clahe,
-        augment=cfg.augment,
+        clahe=case.clahe,
+        augment=case.augment,
         cache=case.cache,
     )
 
@@ -138,8 +160,8 @@ def test_dataloader_smoke(case: ConfigCase):
         assert images.dtype == tf.float32
         assert genders.dtype == tf.int32
         assert labels.dtype == tf.float32
-        assert images.shape[1] == cfg.target_h
-        assert images.shape[2] == cfg.target_w
+        assert images.shape[1] == case.target_h
+        assert images.shape[2] == case.target_w
         assert genders.shape[0] == labels.shape[0] > 0
         assert bool(tf.math.reduce_all(tf.math.is_finite(images)).numpy())
 
@@ -147,3 +169,52 @@ def test_dataloader_smoke(case: ConfigCase):
         pytest.skip(
             f"Only {batch_count} batches available for config {config_path.stem}, expected {max_batches}"
         )
+
+
+def test_make_roi_dataset_smoke(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "train").mkdir()
+    (data_root / "train.csv").write_text(
+        "Image ID,male,Bone Age (months)\n"
+        "123,1,150.0\n",
+        encoding="utf-8",
+    )
+
+    roi_root = tmp_path / "rois"
+    carpal_dir = roi_root / "train" / "carpal"
+    metaph_dir = roi_root / "train" / "metaph"
+    carpal_dir.mkdir(parents=True)
+    metaph_dir.mkdir(parents=True)
+    _write_dummy_png(carpal_dir / "123.png")
+    _write_dummy_png(metaph_dir / "123.png")
+
+    (roi_root / "train" / "roi_coords.csv").write_text(
+        "image_id,carpal_y0,carpal_x0,carpal_y1,carpal_x1,metaph_y0,metaph_x0,metaph_y1,metaph_x1\n"
+        "123,1,2,5,6,3,4,7,8\n",
+        encoding="utf-8",
+    )
+
+    dataset = make_roi_dataset(
+        data_path=str(data_root),
+        roi_path=str(roi_root),
+        split="train",
+        batch_size=1,
+        cache=False,
+    )
+
+    features, labels = next(iter(dataset.take(1)))
+
+    carpal = features["carpal"].numpy()
+    metaph = features["metaph"].numpy()
+    assert carpal.shape == (1, 8, 8, 1)
+    assert metaph.shape == (1, 8, 8, 1)
+    assert features["gender"].numpy().tolist() == [1]
+    assert features["image_id"].numpy().tolist() == [b"123"]
+    np.testing.assert_array_equal(
+        features["carpal_box"].numpy(), np.array([[1, 2, 5, 6]], dtype=np.int32)
+    )
+    np.testing.assert_array_equal(
+        features["metaph_box"].numpy(), np.array([[3, 4, 7, 8]], dtype=np.int32)
+    )
+    assert labels.numpy().tolist() == [150.0]
