@@ -1,8 +1,9 @@
 from typing import Optional
 import argparse
+import os
 from BoneAgePrediction.training.train_B0 import train_GlobalCNN
 from BoneAgePrediction.training.train_R1 import train_ROI_CNN
-from BoneAgePrediction.utils.logger import get_logger
+from BoneAgePrediction.utils.logger import get_logger, setup_logging
 
 # Map user-friendly aliases to canonical model metadata (name, trainer, default config)
 MODEL_REGISTRY = {
@@ -22,6 +23,7 @@ def main(model_name: str, config_path: Optional[str]) -> None:
       model_name: Name of the model to train (e.g., "GlobalCNN").
       config_path: Path to the configuration file. If None, default settings are used.
    """
+   setup_logging(log_dir=os.path.join("experiments", "logs"))
    normalized_name = model_name.strip().lower()
    logger = get_logger(__name__)
 

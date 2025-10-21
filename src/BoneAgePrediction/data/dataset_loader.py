@@ -311,6 +311,9 @@ def make_dataset(
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
    dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds, id_ds))
+   options = tf.data.Options()
+   options.experimental_deterministic = True
+   dataset = dataset.with_options(options)
       
    def _load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
@@ -460,6 +463,9 @@ def make_roi_dataset(
    carpal_box_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_boxes, dtype=np.int32))
    metaph_box_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_boxes, dtype=np.int32))
    dataset = tf.data.Dataset.zip((carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds, carpal_box_ds, metaph_box_ds))
+   options = tf.data.Options()
+   options.experimental_deterministic = True
+   dataset = dataset.with_options(options)
       
    def _load_pair(
       carpal_path: tf.Tensor,
