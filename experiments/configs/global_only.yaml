@@ -1,13 +1,13 @@
 data:
   data_path: "data/raw"
-  target_h: 512
-  target_w: 512
+  target_h: 224
+  target_w: 224
   keep_aspect_ratio: true
   pad_value: 0.0
   batch_size: 16
   clahe: false
-  augment: true
-  cache: true
+  augment: false
+  cache: false
 
 model:
   num_blocks: 3
@@ -16,7 +16,7 @@ model:
 
 training:
   epochs: 30
-  patience: 10
+  patience: 5
   loss: "huber"
   huber_delta: 10.0
   save_dir: "experiments/checkpoints"

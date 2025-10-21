@@ -20,6 +20,11 @@ try:
 except ImportError:  # fallback when package not installed
    get_logger = logging.getLogger  
 
+try:
+   from keras import layers as keras_layers  # Keras 3 standalone package
+except ImportError:
+   keras_layers = None
+
 logger = get_logger(__name__)
 
 def mae() -> tf.keras.metrics.Metric:
@@ -115,9 +120,47 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          return None
       return _tensor_shape(inferred)
 
+   conv_layer_types = [tf.keras.layers.Conv2D]
+   dense_layer_types = [tf.keras.layers.Dense]
+   batchnorm_layer_types = [tf.keras.layers.BatchNormalization]
+   activation_layer_types = [tf.keras.layers.ReLU, tf.keras.layers.Activation]
+   pooling_layer_types = [
+      tf.keras.layers.MaxPooling2D,
+      tf.keras.layers.AveragePooling2D,
+      tf.keras.layers.GlobalAveragePooling2D,
+   ]
+
+   if keras_layers is not None:
+      for collection, class_name in (
+         (conv_layer_types, "Conv2D"),
+         (dense_layer_types, "Dense"),
+         (batchnorm_layer_types, "BatchNormalization"),
+         (activation_layer_types, "ReLU"),
+         (activation_layer_types, "Activation"),
+         (pooling_layer_types, "MaxPooling2D"),
+         (pooling_layer_types, "AveragePooling2D"),
+         (pooling_layer_types, "GlobalAveragePooling2D"),
+      ):
+         keras_cls = getattr(keras_layers, class_name, None)
+         if keras_cls is not None and keras_cls not in collection:
+            collection.append(keras_cls)
+
+   conv_layer_types = tuple(conv_layer_types)
+   dense_layer_types = tuple(dense_layer_types)
+   batchnorm_layer_types = tuple(batchnorm_layer_types)
+   activation_layer_types = tuple(activation_layer_types)
+   pooling_layer_types = tuple(pooling_layer_types)
+
+   conv_layer_names = {"Conv2D"}
+   dense_layer_names = {"Dense"}
+   batchnorm_layer_names = {"BatchNormalization"}
+   activation_layer_names = {"ReLU", "Activation"}
+   pooling_layer_names = {"MaxPooling2D", "AveragePooling2D", "GlobalAveragePooling2D"}
+
    for layer in model.layers:
+      layer_name = layer.__class__.__name__
       # --- Convolutional layers ---
-      if isinstance(layer, tf.keras.layers.Conv2D):
+      if isinstance(layer, conv_layer_types) or layer_name in conv_layer_names:
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
             continue
@@ -132,7 +175,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          total_macs += conv_macs
 
       # --- Dense (Fully Connected) layers ---
-      elif isinstance(layer, tf.keras.layers.Dense):
+      elif isinstance(layer, dense_layer_types) or layer_name in dense_layer_names:
          kernel = getattr(layer, "kernel", None)
          if kernel is None:
             continue
@@ -146,7 +189,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          total_macs += dense_macs
 
       # --- Batch Normalization ---
-      elif isinstance(layer, tf.keras.layers.BatchNormalization):
+      elif isinstance(layer, batchnorm_layer_types) or layer_name in batchnorm_layer_names:
          # 2 MACs per output element (normalize and scale)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
@@ -156,7 +199,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          total_macs += bn_macs
 
       # --- Activation functions (ReLU, etc.) ---
-      elif isinstance(layer, tf.keras.layers.ReLU) or isinstance(layer, tf.keras.layers.Activation):
+      elif isinstance(layer, activation_layer_types) or layer_name in activation_layer_names:
          # 1 MAC per output element (comparison)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
@@ -166,9 +209,7 @@ def estimate_gmacs(model: tf.keras.Model, input_shape: Tuple[int, int, int]) -> 
          total_macs += activation_macs
 
       # --- Pooling layers (Max/Avg) ---
-      elif isinstance(layer, (tf.keras.layers.MaxPooling2D, 
-                              tf.keras.layers.AveragePooling2D, 
-                              tf.keras.layers.GlobalAveragePooling2D)):
+      elif isinstance(layer, pooling_layer_types) or layer_name in pooling_layer_names:
          # 1 MAC per output element (sum/avg)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:

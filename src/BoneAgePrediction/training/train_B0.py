@@ -3,13 +3,15 @@
 
 from typing import Tuple
 from dataclasses import asdict
+import logging
 import os
 import csv
 import json
+import gc
 import numpy as np
 import tensorflow as tf
 
-from BoneAgePrediction.utils.logger import get_logger 
+from BoneAgePrediction.utils.logger import get_logger, setup_logging 
 from BoneAgePrediction.utils.seeds import set_seeds
 from BoneAgePrediction.utils.config import load_config
 from BoneAgePrediction.utils.path_manager import incremental_path
@@ -24,12 +26,20 @@ from BoneAgePrediction.training.callbacks import make_callbacks
 
 logger = get_logger(__name__)
 
+
+def _ensure_logging() -> None:
+   """Initialize logging to experiments/logs if no handlers configured yet."""
+   if not logging.getLogger().handlers:
+      setup_logging(log_dir=os.path.join("experiments", "logs"))
+
+
 def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
    #TODO: add dpcstring explanation for this function. write in details and explain each step
    
    # -----------------------
    # Config & reproducibility
    # -----------------------
+   _ensure_logging()
    config_bundle = load_config(config_path)
    data_cfg = config_bundle.data
    model_cfg = config_bundle.model
@@ -180,6 +190,13 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
       verbose=1,
    )
    logger.info("Training finished")
+   
+   # -----------------------
+   # Cleanup
+   # -----------------------
+   train_ds = val_ds = None  # drop strong refs before cleanup
+   tf.keras.backend.clear_session()
+   gc.collect()
    
    # -----------------------
    # Complexity & Timing
