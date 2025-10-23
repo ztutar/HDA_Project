@@ -10,6 +10,7 @@ import json
 import gc
 import numpy as np
 import tensorflow as tf
+import keras
 
 from BoneAgePrediction.utils.logger import get_logger, setup_logging 
 from BoneAgePrediction.utils.seeds import set_seeds
@@ -35,7 +36,7 @@ def _ensure_logging() -> None:
       setup_logging(log_dir=os.path.join("experiments", "logs"))
 
 
-def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
+def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.History]:
    #TODO: add docstring explanation for this function. write in details and explain each step
    """
    Orchestrate ROI-only training:
@@ -160,7 +161,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
    beta_1 = optimizer_cfg.beta_1 # Exponential decay rate for the 1st moment estimates.
    beta_2 = optimizer_cfg.beta_2 # Exponential decay rate for the 2nd moment estimates.
    epsilon = optimizer_cfg.epsilon # Small constant for numerical stability.
-   optimizer = tf.keras.optimizers.Adam(
+   optimizer = keras.optimizers.Adam(
       learning_rate=learning_rate,
       beta_1=beta_1,
       beta_2=beta_2,
@@ -217,14 +218,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
       callbacks=callbacks,
       verbose=1,
    )
-   logger.info("Training finished")
-   
-   # -----------------------
-   # Cleanup
-   # -----------------------
-   train_ds = val_ds = None  # drop strong refs before cleanup
-   tf.keras.backend.clear_session()
-   gc.collect() 
+   logger.info("Training finished") 
 
    
    # -----------------------
@@ -292,5 +286,13 @@ def train_ROI_CNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.
          config_params,
       ])
    logger.info("Appended training summary to %s", results_csv)
+   
+   # -----------------------
+   # Cleanup
+   # -----------------------
+   train_ds = val_ds = None  # drop strong refs before cleanup
+   keras.backend.clear_session()
+   gc.collect()
+   logger.info("Cleaned up after training")
       
    return model, history

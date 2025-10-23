@@ -13,6 +13,7 @@ import os
 import random
 import numpy as np
 import tensorflow as tf
+import keras
 
 try:
    from BoneAgePrediction.utils.logger import get_logger  # type: ignore
@@ -32,4 +33,5 @@ def set_seeds(seed: int = 42):
    random.seed(seed)
    np.random.seed(seed)
    tf.random.set_seed(seed)
-   logger.debug("Seeds applied to os.environ, random, numpy, and tensorflow.")
+   keras.random.set_seed(seed)
+   logger.debug("Seeds applied to os.environ, random, numpy, tensorflow and keras.")

@@ -12,8 +12,10 @@ an ordered list ready to pass into `model.fit`.
 from typing import List
 import os
 import tensorflow as tf
+from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping, TensorBoard, CSVLogger
 
-def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10) -> List[tf.keras.callbacks.Callback]:
+
+def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10) -> List[Callback]:
    """
    Creates a list of Keras callbacks for training: Checkpoint, EarlyStopping, TensorBoard 
 
@@ -28,8 +30,9 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
    os.makedirs(save_dir, exist_ok=True)
    checkpoint_path = os.path.join(save_dir, f"{model_name}_best.keras")
    tb_logs_path = os.path.join(save_dir, f"{model_name}_tensorboard_logs")
+   csv_logs_path = os.path.join(save_dir, f"{model_name}_training_log.csv")
    
-   checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+   checkpoint_cb = ModelCheckpoint(
       filepath=checkpoint_path,
       monitor='val_mae',
       mode='min',
@@ -38,7 +41,7 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
       verbose=1
    )
    
-   earlystop_cb = tf.keras.callbacks.EarlyStopping(
+   earlystop_cb = EarlyStopping(
       monitor='val_mae',
       mode='min',
       patience=patience,
@@ -46,11 +49,17 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
       verbose=1
    )
    
-   tensorboard_cb = tf.keras.callbacks.TensorBoard(
+   tensorboard_cb = TensorBoard(
       log_dir=tb_logs_path,
-      histogram_freq=0,
+      histogram_freq=1,
       write_graph=False
    )
    
-   return [checkpoint_cb, earlystop_cb, tensorboard_cb]
+   csvlogger_cb = CSVLogger(
+      filename=csv_logs_path,
+      separator=",",
+      append=True
+      )
+   
+   return [checkpoint_cb, earlystop_cb, tensorboard_cb, csvlogger_cb]
    

@@ -19,14 +19,13 @@ def peak_loc_heatmap(heatmap: tf.Tensor) -> Tuple[int, int]:
    return int(y), int(x)
 
 def square_box_around(center_y: int, center_x: int,
-                     size: int, margin_frac: float,
-                     H: int, W: int) -> Tuple[int, int, int, int]:
+                     margin_frac: float, H: int, W: int,
+                     ) -> Tuple[int, int, int, int]:
    """
-   Build a square crop around a center with a fractional margin.
+   Build a square crop around (center_y, center_x) using a margin fraction of image size.
 
    Args:
       center_y, center_x (int): Peak coordinates.
-      size (int): Target crop size (square).
       margin_frac (float): Extra context as a fraction of min(H,W).
       H, W (int): Heatmap/image dimensions.
 
@@ -99,7 +98,7 @@ def extract_rois_from_heatmap(
    if heatmap[cy1, cx1] < heatmap_threshold:
       # fallback: center
       cy1, cx1 = H // 2, W // 2
-   y0_a, x0_a, y1_a, x1_a = square_box_around(cy1, cx1, roi_size, carpal_margin, H, W)
+   y0_a, x0_a, y1_a, x1_a = square_box_around(cy1, cx1, carpal_margin, H, W)
    crop_a = tf.image.resize(image[y0_a:y1_a, x0_a:x1_a, :], size=(roi_size, roi_size), antialias=True)
    
    # --- 2) Metacarpal/phalange from second peak ---
@@ -108,7 +107,7 @@ def extract_rois_from_heatmap(
    if heatmap2[cy2, cx2] < heatmap_threshold:
       # fallback: opposite quadrant
       cy2, cx2 = max(0, H - cy1), max(0, W - cx1)
-   y0_b, x0_b, y1_b, x1_b = square_box_around(cy2, cx2, roi_size, carpal_margin, H, W)
+   y0_b, x0_b, y1_b, x1_b = square_box_around(cy2, cx2, carpal_margin, H, W)
    crop_b = tf.image.resize(image[y0_b:y1_b, x0_b:x1_b, :], size=(roi_size, roi_size), antialias=True)
    
    rois = {
