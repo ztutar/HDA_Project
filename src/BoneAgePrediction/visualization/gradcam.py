@@ -1,7 +1,7 @@
-from typing import Tuple, Optional, Dict
+from typing import Optional
 import tensorflow as tf
 import numpy as np
-from keras import Model, backend, layers
+from keras import Model, layers
 from BoneAgePrediction.visualization.overlay import overlay_cam_on_image
 
 

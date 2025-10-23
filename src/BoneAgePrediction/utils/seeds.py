@@ -30,8 +30,7 @@ def set_seeds(seed: int = 42):
    """
    logger.info("Setting random seeds to %d", seed)
    os.environ['PYTHONHASHSEED'] = str(seed)
-   random.seed(seed)
-   np.random.seed(seed)
-   tf.random.set_seed(seed)
-   keras.random.set_seed(seed)
+   keras.utils.set_random_seed(seed)
+   tf.keras.utils.set_random_seed(seed)
+   tf.config.experimental.enable_op_determinism()
    logger.debug("Seeds applied to os.environ, random, numpy, tensorflow and keras.")

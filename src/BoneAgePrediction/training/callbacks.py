@@ -43,6 +43,7 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
    
    earlystop_cb = EarlyStopping(
       monitor='val_mae',
+      min_delta=0,
       mode='min',
       patience=patience,
       restore_best_weights=True,

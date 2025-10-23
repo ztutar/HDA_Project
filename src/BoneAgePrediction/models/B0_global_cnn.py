@@ -17,7 +17,7 @@ that can be reused for different experiments with minimal changes.
 
 from typing import Sequence, Tuple
 import tensorflow as tf
-from keras import layers, Model
+from keras import layers, Model, initializers
 
 def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
                      channels: Sequence[int] = (32, 64, 128),
@@ -32,7 +32,7 @@ def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
    
    Args:
       input_shape (Tuple[int, int, int], optional): Shape of the input image. Defaults to (512, 512, 1).
-      channels (Sequence[int], optional): Number of channels for each block. Length should be equal to num_blocks. Defaults to (32, 64, 128).
+      channels (Sequence[int], optional): Number of channels for each block. Defaults to (32, 64, 128).
       dense_units (int, optional): Number of units in the dense layer before the output. Defaults to 64.
       name (str, optional): Name of the model. Defaults to "B01_Global_CNN".
    
