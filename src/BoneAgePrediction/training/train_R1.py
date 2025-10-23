@@ -1,12 +1,10 @@
 #TODO: add docstring explanation for this module. write in details and explain each function
 
 
-from typing import Tuple, Dict
+from typing import Tuple
 from dataclasses import asdict
 import logging
 import os
-import csv
-import json
 import gc
 import numpy as np
 import tensorflow as tf
@@ -26,6 +24,7 @@ from BoneAgePrediction.models.R1_roi_cnn import build_ROI_CNN
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, estimate_gmacs, EpochTimer
 from BoneAgePrediction.training.callbacks import make_callbacks
+from BoneAgePrediction.training.summary import append_summary_row
 
 logger = get_logger(__name__)
 
@@ -63,7 +62,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    
    config_filename = os.path.basename(config_path) if config_path else "default"
    config_dict = asdict(config_bundle)
-   config_params = json.dumps(config_bundle.raw, sort_keys=True)
    model_name = "R1_ROI_CNN"
    logger.info(f"Starting {model_name} training using config %s", config_filename)
    logger.debug("Configuration parameters: %s", config_dict)
@@ -242,49 +240,44 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    # Summary CSV
    # -----------------------
    results_csv = training_cfg.results_csv
-   os.makedirs(os.path.dirname(results_csv), exist_ok=True)
-   header = [
-      "model_name",
-      "num_params",
-      "gmacs",
-      "avg_epoch_time_s",
-      "best_train_mae",
-      "best_train_rmse",
-      "best_val_mae",
-      "best_val_rmse",
-      "config_file",
-      "config_params",
-   ]
-   
-   best_train_mae = float(np.min(history.history.get("mae", [np.inf])))
-   best_train_rmse = float(np.min(history.history.get("rmse", [np.inf])))
-   best_val_mae = float(np.min(history.history.get("val_mae", [np.inf])))
-   best_val_rmse = float(np.min(history.history.get("val_rmse", [np.inf])))
+   val_mae_history = history.history.get("val_mae", [])
+   best_epoch_idx = int(np.argmin(val_mae_history)) if val_mae_history else None
+
+   def metric_at(name: str, idx: int, default: float = float("nan")) -> float:
+      series = history.history.get(name)
+      if series is None or idx is None or idx >= len(series):
+         return default
+      return float(series[idx])
+
+   train_mae = metric_at("mae", best_epoch_idx)
+   train_rmse = metric_at("rmse", best_epoch_idx)
+   val_mae = metric_at("val_mae", best_epoch_idx)
+   val_rmse = metric_at("val_rmse", best_epoch_idx)
+
    logger.info(
-      "Best metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
-      best_train_mae,
-      best_train_rmse,
-      best_val_mae,
-      best_val_rmse,
+      "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
+      train_mae,
+      train_rmse,
+      val_mae,
+      val_rmse,
    )
    
-   write_header = not os.path.exists(results_csv)
-   with open(results_csv, "a", newline="") as f:
-      w = csv.writer(f)
-      if write_header:
-         w.writerow(header)
-      w.writerow([
-         model_name,
-         num_params,
-         f"{gmacs:.3f}",
-         f"{avg_epoch_time:.2f}",
-         f"{best_train_mae:.4f}",
-         f"{best_train_rmse:.4f}",
-         f"{best_val_mae:.4f}",
-         f"{best_val_rmse:.4f}",
-         config_filename,
-         config_params,
-      ])
+   summary_base = {
+      "model_name": model_name,
+      "num_params": num_params,
+      "gmacs": f"{gmacs:.3f}",
+      "avg_epoch_time_s": avg_time_display,
+      "train_mae": f"{train_mae:.4f}",
+      "train_rmse": f"{train_rmse:.4f}",
+      "val_mae": f"{val_mae:.4f}",
+      "val_rmse": f"{val_rmse:.4f}",
+   }
+   append_summary_row(
+      results_csv=results_csv,
+      base_data=summary_base,
+      config_bundle=config_bundle,
+      config_filename=config_filename,
+   )
    logger.info("Appended training summary to %s", results_csv)
    
    # -----------------------

@@ -16,10 +16,7 @@ from typing import Any, Dict, Optional, get_args, get_origin
 import logging
 import yaml
 import json
-try:
-   from BoneAgePrediction.utils.logger import get_logger  # type: ignore
-except ImportError:  # fallback to stdlib logger if package not installed
-   get_logger = logging.getLogger  # type: ignore
+from BoneAgePrediction.utils.logger import get_logger 
 
 CONFIG_BASE_DIR = Path("experiments/configs")
 
