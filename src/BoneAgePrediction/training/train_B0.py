@@ -8,8 +8,10 @@ import os
 import csv
 import json
 import gc
+import io
 import numpy as np
 import tensorflow as tf
+import keras
 
 from BoneAgePrediction.utils.logger import get_logger, setup_logging 
 from BoneAgePrediction.utils.seeds import set_seeds
@@ -33,7 +35,7 @@ def _ensure_logging() -> None:
       setup_logging(log_dir=os.path.join("experiments", "logs"))
 
 
-def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
+def train_GlobalCNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.History]:
    #TODO: add dpcstring explanation for this function. write in details and explain each step
    
    # -----------------------
@@ -94,7 +96,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    )
    logger.info("Prepared training and validation datasets from %s", data_path)
 
-   def _select_image(features, label):
+   def _select_image(features: dict, label: tf.Tensor):
       return features["image"], label
 
    train_ds = train_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
@@ -132,7 +134,7 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    beta_1 = optimizer_cfg.beta_1 # Exponential decay rate for the 1st moment estimates.
    beta_2 = optimizer_cfg.beta_2 # Exponential decay rate for the 2nd moment estimates.
    epsilon = optimizer_cfg.epsilon # Small constant for numerical stability.
-   optimizer = tf.keras.optimizers.Adam(
+   optimizer = keras.optimizers.Adam(
       learning_rate=learning_rate,
       beta_1=beta_1,
       beta_2=beta_2,
@@ -175,6 +177,11 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    )
    epoch_timer = EpochTimer()
    callbacks.append(epoch_timer)
+   # learning rate schedule
+   reduce_lr = keras.callbacks.ReduceLROnPlateau(
+      monitor='val_mae', factor=0.1,
+      patience=4, min_lr=0.0001, verbose=1)
+   callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
    
    # -----------------------
@@ -192,13 +199,6 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
    logger.info("Training finished")
    
    # -----------------------
-   # Cleanup
-   # -----------------------
-   train_ds = val_ds = None  # drop strong refs before cleanup
-   tf.keras.backend.clear_session()
-   gc.collect()
-   
-   # -----------------------
    # Complexity & Timing
    # -----------------------
    num_params = count_params(model)
@@ -214,7 +214,12 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
       gmacs,
       avg_time_display,
    )
-      
+   
+   model.summary()
+   summary_stream = io.StringIO()
+   model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
+   logger.info("Model summary:\n%s", summary_stream.getvalue())
+   
    # -----------------------
    # Summary CSV
    # -----------------------
@@ -263,5 +268,13 @@ def train_GlobalCNN(config_path: str) -> Tuple[tf.keras.Model, tf.keras.callback
          config_params,
       ])
    logger.info("Appended training summary to %s", results_csv)
+
+   # -----------------------
+   # Cleanup
+   # -----------------------
+   train_ds = val_ds = None  # drop strong refs before cleanup
+   keras.backend.clear_session()
+   gc.collect()
+   logger.info("Cleaned up after training")
       
    return model, history

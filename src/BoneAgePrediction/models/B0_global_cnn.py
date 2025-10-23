@@ -20,7 +20,6 @@ import tensorflow as tf
 from keras import layers, Model
 
 def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
-                     num_blocks: int = 3,
                      channels: Sequence[int] = (32, 64, 128),
                      dense_units: int = 64,
                      name: str = "B0_Global_CNN") -> Model:
@@ -28,12 +27,11 @@ def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
    Builds a global CNN model for feature extraction.
    
    Architecture:
-      [ (Conv-BN-ReLU) x2 -> MaxPool ] * num_blocks
+      [ (Conv-BN-ReLU) x2 -> MaxPool ] * len(channels)
       -> GlobalAveragePooling -> Dense(dense_units) -> Dense(1)
    
    Args:
       input_shape (Tuple[int, int, int], optional): Shape of the input image. Defaults to (512, 512, 1).
-      num_blocks (int, optional): Number of downsampling blocks (must equal len(channels)).Defaults to 3.
       channels (Sequence[int], optional): Number of channels for each block. Length should be equal to num_blocks. Defaults to (32, 64, 128).
       dense_units (int, optional): Number of units in the dense layer before the output. Defaults to 64.
       name (str, optional): Name of the model. Defaults to "B01_Global_CNN".
@@ -43,7 +41,6 @@ def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
                      Inputs:  image: float32 [B,H,W,1]
                      Outputs: age  : float32 [B,1]
    """
-   assert num_blocks == len(channels), "num_blocks must equal len(channels)"
    input_image = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
    
    x = input_image
@@ -60,8 +57,6 @@ def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
    
    model = Model(inputs=input_image, outputs=output_age, name=name)
    return model
-
-
 
 
 def conv_bn_relu(x: tf.Tensor, filters:int, k_size:int = 3, s:int = 1) -> tf.Tensor:

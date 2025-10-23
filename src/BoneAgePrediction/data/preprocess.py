@@ -15,22 +15,9 @@ import os
 import shutil
 import cv2
 import argparse
-import logging
 from tqdm import tqdm
-try:
-   from BoneAgePrediction.data.dataset_loader import read_csv_labels, build_id_to_path  
-except ImportError:  # fallback in ad-hoc runs
-   from dataset_loader import read_csv_labels, build_id_to_path  
-
-try:
-   from BoneAgePrediction.utils.logger import get_logger, setup_logging  
-except ImportError:  # fallback when package not installed
-   get_logger = logging.getLogger  
-   def setup_logging(*args, **kwargs):  
-      logger = logging.getLogger()
-      if not logger.handlers:
-         logging.basicConfig(level=logging.INFO)
-      return logger
+from BoneAgePrediction.data.dataset_loader import read_csv_labels, build_id_to_path   
+from BoneAgePrediction.utils.logger import get_logger, setup_logging  
 
 def offline_clahe(data_dir: str, out_dir: str) -> None:
    """

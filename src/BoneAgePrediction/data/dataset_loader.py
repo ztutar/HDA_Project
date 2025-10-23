@@ -196,13 +196,13 @@ def augment_image(image: tf.Tensor) -> tf.Tensor:
       tf.Tensor: Augmented image tensor.
    """
    # random flips
-   image = tf.image.random_flip_left_right(image)
+   image = tf.image.stateless_random_flip_left_right(image)
    # random rotations (~±7 degrees)
    angle = tf.random.uniform([], minval=-7.0, maxval=7.0) * (np.pi / 180.0)  # Convert degrees to radians
    image = image_rotate(image, angle)
    # brightness and contrast jitter
-   image = tf.image.random_brightness(image, max_delta=0.05)
-   image = tf.image.random_contrast(image, lower=0.95, upper=1.05)
+   image = tf.image.stateless_random_brightness(image, max_delta=0.05)
+   image = tf.image.stateless_random_contrast(image, lower=0.95, upper=1.05)
    return image
 
 def image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:

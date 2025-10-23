@@ -4,6 +4,7 @@ from typing import Tuple, Dict, List
 import os, csv
 import tensorflow as tf
 import numpy as np
+from keras import optimizers
 
 from BoneAgePrediction.data.dataset_loader import make_dataset
 from BoneAgePrediction.models.B0_global_cnn import build_GlobalCNN
@@ -67,12 +68,11 @@ def train_locator_and_save_rois(
    
    roi_loc_model = build_GlobalCNN(
       input_shape = input_shape,
-      num_blocks = locator_cfg.num_blocks,
       channels = tuple(locator_cfg.channels),
       dense_units = locator_cfg.dense_units,
       name="ROI_Locator_CNN",
    )
-   optimizer = tf.keras.optimizers.Adam(learning_rate=locator_cfg.learning_rate)
+   optimizer = optimizers.Adam(learning_rate=locator_cfg.learning_rate)
    roi_loc_model.compile(optimizer=optimizer, loss=get_loss("huber", 10.0), metrics=[mae(), rmse()])
 
    if split == "train":
@@ -99,9 +99,8 @@ def train_locator_and_save_rois(
          "carpal_y0","carpal_x0","carpal_y1","carpal_x1",
          "metaph_y0","metaph_x0","metaph_y1","metaph_x1",
       ])
-      for features, labels in ds.unbatch():
+      for features, _ in ds.unbatch():
          image = features["image"]                        # [H,W,1], float32
-         gender = features["gender"]                      # [ ], int32
          image_id = features["image_id"]                  # [ ], string
          
          # Compute Grad-CAM on the locator
