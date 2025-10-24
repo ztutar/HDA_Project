@@ -280,11 +280,11 @@ class EpochTimer(tf.keras.callbacks.Callback):
       self.epoch_times: list[float] = []
       self.t0 = 0.0
       
-   def on_train_begin(self) -> None:
+   def on_train_begin(self, logs=None) -> None:
       self.epoch_times = []
       logger.info("EpochTimer started timing training run.")
    
-   def on_epoch_end(self, epoch: int) -> None:
+   def on_epoch_end(self, epoch: int, logs=None) -> None:
       self.epoch_times.append(time.time() - self.t0)
       duration = self.epoch_times[-1]
       logger.info("Epoch %d duration: %.2f sec", epoch + 1, duration)
