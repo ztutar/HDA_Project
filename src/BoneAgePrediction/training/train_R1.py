@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 import keras
 
-from BoneAgePrediction.utils.logger import get_logger, setup_logging 
+from BoneAgePrediction.utils.logger import get_logger, setup_logging, mirror_keras_stdout_to_file
 from BoneAgePrediction.utils.seeds import set_seeds
 from BoneAgePrediction.utils.config import load_config
 from BoneAgePrediction.utils.path_manager import incremental_path
@@ -33,6 +33,7 @@ def _ensure_logging() -> None:
    """Initialize logging to experiments/logs if no handlers configured yet."""
    if not logging.getLogger().handlers:
       setup_logging(log_dir=os.path.join("experiments", "logs"))
+   mirror_keras_stdout_to_file()
 
 
 def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.History]:

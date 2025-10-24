@@ -48,7 +48,7 @@ def count_params(model: Model) -> int:
       int: Total number of parameters.
    """
    total = int(model.count_params())
-   logger.debug("Model %s has %d parameters", getattr(model, "name", "<unnamed>"), total)
+   logger.info("Model %s has %d parameters", getattr(model, "name", "<unnamed>"), total)
    return total
 
 def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
@@ -93,7 +93,7 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
    else:
       model_feed = _random_like(tf.TensorShape(input_tensors[0].shape)[1:])
    _ = model(model_feed, training=False)
-   logger.debug("Initialized model %s for GMAC estimation using input_shape=%s", getattr(model, "name", "<unnamed>"), input_shape)
+   logger.info("Initialized model %s for GMAC estimation using input_shape=%s", getattr(model, "name", "<unnamed>"), input_shape)
 
    def _tensor_shape(shape: tf.TensorShape):
       if shape is None:
@@ -138,9 +138,9 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
          keras_cls = getattr(model_layers, class_name, None)
          if keras_cls is not None and keras_cls not in collection:
             collection.append(keras_cls)
-            logger.debug("Registered %s layer class from model namespace for GMACs accounting.", class_name)
+            logger.info("Registered %s layer class from model namespace for GMACs accounting.", class_name)
    else:
-      logger.debug(
+      logger.info(
          "Model %s misses a 'layers' namespace; using default layer collections for GMACs accounting.",
          type(model).__name__,
       )
@@ -159,24 +159,24 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
 
    for layer in model.layers:
       layer_name = layer.__class__.__name__
-      logger.debug("Evaluating layer %s (%s) for GMACs estimation.", getattr(layer, "name", "<unnamed>"), layer_name)
+      logger.info("Evaluating layer %s (%s) for GMACs estimation.", getattr(layer, "name", "<unnamed>"), layer_name)
       # --- Convolutional layers ---
       if isinstance(layer, conv_layer_types) or layer_name in conv_layer_names:
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
-            logger.debug("Skipping conv layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping conv layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
             continue
          H_out, W_out, C_out = int(output_shape[1]), int(output_shape[2]), int(output_shape[3])
          kernel = getattr(layer, "kernel", None)
          if kernel is None:
-            logger.debug("Skipping conv layer %s: kernel attribute missing.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping conv layer %s: kernel attribute missing.", getattr(layer, "name", "<unnamed>"))
             continue
          kernel_shape = kernel.shape
          K_h, K_w = int(kernel_shape[0]), int(kernel_shape[1])
          K_in = int(kernel_shape[2])
          conv_macs = H_out * W_out * C_out * (K_h * K_w * K_in)
          total_macs += conv_macs
-         logger.debug(
+         logger.info(
             "Conv layer %s: output_shape=%s kernel_shape=%s -> %.0f MACs",
             getattr(layer, "name", "<unnamed>"),
             tuple(output_shape),
@@ -188,18 +188,18 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
       elif isinstance(layer, dense_layer_types) or layer_name in dense_layer_names:
          kernel = getattr(layer, "kernel", None)
          if kernel is None:
-            logger.debug("Skipping dense layer %s: kernel attribute missing.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping dense layer %s: kernel attribute missing.", getattr(layer, "name", "<unnamed>"))
             continue
          kernel_shape = kernel.shape
          units_in = int(kernel_shape[0])
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
-            logger.debug("Skipping dense layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping dense layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
             continue
          units_out = int(kernel_shape[1] if len(kernel_shape) > 1 else output_shape[-1])
          dense_macs = units_in * units_out
          total_macs += dense_macs
-         logger.debug(
+         logger.info(
             "Dense layer %s: units_in=%d units_out=%d -> %.0f MACs",
             getattr(layer, "name", "<unnamed>"),
             units_in,
@@ -212,12 +212,12 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
          # 2 MACs per output element (normalize and scale)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
-            logger.debug("Skipping batchnorm layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping batchnorm layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
             continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          bn_macs = 2 * elements
          total_macs += bn_macs
-         logger.debug(
+         logger.info(
             "BatchNorm layer %s: output_shape=%s -> %.0f MACs",
             getattr(layer, "name", "<unnamed>"),
             tuple(output_shape),
@@ -229,12 +229,12 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
          # 1 MAC per output element (comparison)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
-            logger.debug("Skipping activation layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping activation layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
             continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          activation_macs = elements
          total_macs += activation_macs
-         logger.debug(
+         logger.info(
             "Activation layer %s: output_shape=%s -> %.0f MACs",
             getattr(layer, "name", "<unnamed>"),
             tuple(output_shape),
@@ -246,12 +246,12 @@ def estimate_gmacs(model: Model, input_shape: Tuple[int, int, int]) -> float:
          # 1 MAC per output element (sum/avg)
          output_shape = _layer_output_shape(layer)
          if output_shape is None:
-            logger.debug("Skipping pooling layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
+            logger.info("Skipping pooling layer %s: unable to determine output shape.", getattr(layer, "name", "<unnamed>"))
             continue
          elements = np.prod(output_shape[1:])  # exclude batch dimension
          pooling_macs = elements 
          total_macs += pooling_macs
-         logger.debug(
+         logger.info(
             "Pooling layer %s: output_shape=%s -> %.0f MACs",
             getattr(layer, "name", "<unnamed>"),
             tuple(output_shape),
@@ -280,15 +280,11 @@ class EpochTimer(tf.keras.callbacks.Callback):
       self.epoch_times: list[float] = []
       self.t0 = 0.0
       
-   def on_train_begin(self, logs=None) -> None:
+   def on_train_begin(self) -> None:
       self.epoch_times = []
       logger.info("EpochTimer started timing training run.")
-      
-   def on_epoch_begin(self, epoch: int, logs=None) -> None:
-      self.t0 = time.time()
-      logger.debug("Epoch %d started.", epoch + 1)
    
-   def on_epoch_end(self, epoch: int, logs=None) -> None:
+   def on_epoch_end(self, epoch: int) -> None:
       self.epoch_times.append(time.time() - self.t0)
       duration = self.epoch_times[-1]
       logger.info("Epoch %d duration: %.2f sec", epoch + 1, duration)

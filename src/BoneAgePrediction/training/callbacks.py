@@ -43,7 +43,7 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
    
    earlystop_cb = EarlyStopping(
       monitor='val_mae',
-      min_delta=0,
+      min_delta=0.2,
       mode='min',
       patience=patience,
       restore_best_weights=True,
@@ -53,7 +53,7 @@ def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10)
    tensorboard_cb = TensorBoard(
       log_dir=tb_logs_path,
       histogram_freq=1,
-      write_graph=False
+      write_graph=True
    )
    
    csvlogger_cb = CSVLogger(
