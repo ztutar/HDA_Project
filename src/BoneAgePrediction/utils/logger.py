@@ -16,12 +16,14 @@ import os
 import sys
 import threading
 from datetime import datetime
-from typing import Optional
+from importlib import import_module
+from typing import Optional, Sequence, Tuple
 
 
 _FILE_HANDLER: Optional[logging.Handler] = None
 _KERAS_STDOUT_PATCHED = False
 _KERAS_PATCH_LOCK = threading.Lock()
+_MODULE_LOGGER = logging.getLogger(__name__)
 
 def setup_logging(
    log_dir: Optional[str] = None,
@@ -69,7 +71,7 @@ def setup_logging(
       _FILE_HANDLER = file_handler
 
    logger.propagate = propagate
-   logger.debug("Logger initialized (level=%s, log_dir=%s)", level, log_dir)
+   logger.info("Logger initialized (level=%s, log_dir=%s)", level, log_dir)
    return logger
 
 
@@ -93,11 +95,7 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
          _FILE_HANDLER = _detect_file_handler()
 
       if _FILE_HANDLER is None:
-         return
-
-      try:
-         from tensorflow.keras.utils import io_utils  # type: ignore import
-      except Exception:
+         _MODULE_LOGGER.debug("No file handler detected; skipping Keras stdout mirroring.")
          return
 
       numeric_level = getattr(logging, level.upper(), logging.INFO)
@@ -107,10 +105,26 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
       capture_logger.handlers.clear()
       capture_logger.addHandler(_FILE_HANDLER)
 
-      original_print_msg = io_utils.print_msg
+      targets: Sequence[Tuple[object, object]] = []
+      for module_name in ("tensorflow.keras.utils.io_utils", "keras.utils.io_utils"):
+         try:
+            module = import_module(module_name)
+         except Exception:
+            continue
+
+         original = getattr(module, "print_msg", None)
+         if original is None:
+            continue
+         targets.append((module, original))
+
+      if not targets:
+         _MODULE_LOGGER.info("Unable to import Keras io_utils; skipping stdout mirroring.")
+         return
+
+      primary_original = targets[0][1]
 
       def print_msg_with_mirror(message, line_break: bool = True, **kwargs):
-         original_print_msg(message, line_break=line_break, **kwargs)
+         primary_original(message, line_break=line_break, **kwargs)
          if not line_break:
             return
          text = (message or "").strip()
@@ -121,8 +135,13 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
             if clean_line:
                capture_logger.log(numeric_level, clean_line)
 
-      io_utils.print_msg = print_msg_with_mirror
+      for module, _ in targets:
+         setattr(module, "print_msg", print_msg_with_mirror)
+
       _KERAS_STDOUT_PATCHED = True
+      _MODULE_LOGGER.info(
+         "Mirroring Keras stdout to %s", getattr(_FILE_HANDLER, "baseFilename", "<memory>")
+      )
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:

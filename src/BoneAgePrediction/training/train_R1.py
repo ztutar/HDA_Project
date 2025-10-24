@@ -22,7 +22,7 @@ from BoneAgePrediction.roi.roi_locator import train_locator_and_save_rois
 from BoneAgePrediction.models.R1_roi_cnn import build_ROI_CNN
 
 from BoneAgePrediction.training.losses import get_loss
-from BoneAgePrediction.training.metrics import mae, rmse, count_params, estimate_gmacs, EpochTimer
+from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
 from BoneAgePrediction.training.callbacks import make_callbacks
 from BoneAgePrediction.training.summary import append_summary_row
 
@@ -224,16 +224,14 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    # Complexity & Timing
    # -----------------------
    num_params = count_params(model)
-   gmacs = estimate_gmacs(model, roi_shape)
    epoch_times = epoch_timer.epoch_times
    avg_epoch_time = np.mean(epoch_times) if epoch_times else None
-   print(f"[{model_name}] Number of Params: {num_params:,} | GMACs(est): {gmacs:.3f} | Avg epoch time: {avg_epoch_time:.2f}s")
+   print(f"[{model_name}] Number of Params: {num_params:,} Avg epoch time: {avg_epoch_time:.2f}s")
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
    logger.info(
-      "[%s] Params: %d | GMACs(est): %.3f | Avg epoch time: %s s",
+      "[%s] Params: %d Avg epoch time: %s s",
       model_name,
       num_params,
-      gmacs,
       avg_time_display,
    )
       
@@ -266,7 +264,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    summary_base = {
       "model_name": model_name,
       "num_params": num_params,
-      "gmacs": f"{gmacs:.3f}",
       "avg_epoch_time_s": avg_time_display,
       "train_mae": f"{train_mae:.4f}",
       "train_rmse": f"{train_rmse:.4f}",
