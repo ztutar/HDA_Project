@@ -187,3 +187,6 @@ data/*
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# ignore experiments/checkpoints folder
+experiments/checkpoints/*

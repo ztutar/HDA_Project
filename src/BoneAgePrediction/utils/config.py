@@ -46,7 +46,6 @@ class DataConfig:
 
 @dataclass
 class ModelConfig:
-   num_blocks: int = 3
    channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    dense_units: int = 64
    use_gender: bool = False

@@ -32,7 +32,6 @@ def _write_minimal_config(tmp_path: Path) -> Path:
             "cache": False,
         },
         "model": {
-            "num_blocks": 1,
             "channels": [8],
             "dense_units": 8,
         },

@@ -22,17 +22,16 @@ import csv
 from typing import Dict, Tuple, List
 import numpy as np
 import tensorflow as tf
-import logging
-try:
-   from BoneAgePrediction.utils.logger import get_logger  
-except ImportError:  #fallback when package not installed
-   get_logger = logging.getLogger  
+from BoneAgePrediction.utils.logger import get_logger  
 
 try:
    import cv2 # used only if CLAHE = True
    _HAS_CV2 = True
 except Exception:
    _HAS_CV2 = False
+   
+
+logger = get_logger(__name__)
    
 # ---------- CSV reading helpers ----------
 def read_csv_labels(csv_path: str) -> List[Dict]:
@@ -43,7 +42,6 @@ def read_csv_labels(csv_path: str) -> List[Dict]:
    Returns:
       List[Dict]: A list of dicts: {'image_id': '4360', 'male': 1, 'age_months': 168.93}
    """
-   logger = get_logger(__name__)
    rows = []
    with open(csv_path, newline="") as csvfile:
       reader = csv.DictReader(csvfile)
@@ -171,6 +169,7 @@ def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    image_clahe = tf.numpy_function(clahe_uint8, [image_uint8], tf.uint8)  # [H,W], uint8
    image_clahe = tf.expand_dims(image_clahe, axis=-1)  # [H,W,1], uint8
    image_clahe = tf.image.convert_image_dtype(image_clahe, tf.float32)  # [H,W,1], float32 in [0,1]
+   image_clahe = tf.ensure_shape(image_clahe, image.shape)
    return image_clahe  
 
 def zscore_norm(image: tf.Tensor, eps: float = 1e-7) -> tf.Tensor:
@@ -196,13 +195,13 @@ def augment_image(image: tf.Tensor) -> tf.Tensor:
       tf.Tensor: Augmented image tensor.
    """
    # random flips
-   image = tf.image.stateless_random_flip_left_right(image)
-   # random rotations (~±7 degrees)
-   angle = tf.random.uniform([], minval=-7.0, maxval=7.0) * (np.pi / 180.0)  # Convert degrees to radians
+   image = tf.image.random_flip_left_right(image)
+   # random rotations (~±5 degrees)
+   angle = tf.random.uniform([], minval=-5.0, maxval=5.0) * (np.pi / 180.0)  # Convert degrees to radians
    image = image_rotate(image, angle)
    # brightness and contrast jitter
-   image = tf.image.stateless_random_brightness(image, max_delta=0.05)
-   image = tf.image.stateless_random_contrast(image, lower=0.95, upper=1.05)
+   image = tf.image.random_brightness(image, max_delta=0.05)
+   image = tf.image.random_contrast(image, lower=0.95, upper=1.05)
    return image
 
 def image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:
@@ -311,7 +310,6 @@ def make_dataset(
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
    dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds, id_ds))
-   options = tf.data.Options()
       
    def _load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
@@ -341,11 +339,12 @@ def make_dataset(
       
       if clahe:
          image = apply_clahe(image)  # CLAHE preprocessing
-      image = zscore_norm(image)  # z-score normalization
 
       is_train = split == "train"
       if is_train and augment:
          image = augment_image(image)  # data augmentation
+      
+      image = zscore_norm(image)  # z-score normalization
          
       features = {
          "image": image, 

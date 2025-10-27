@@ -1,27 +1,28 @@
 data:
   data_path: "data/raw"
-  target_h: 224
-  target_w: 224
-  keep_aspect_ratio: true
+  target_h: 256
+  target_w: 256
+  keep_aspect_ratio: false
   pad_value: 0.0
   batch_size: 16
-  clahe: false
+  clahe: true
   augment: false
   cache: false
 
 model:
   channels: [32, 64, 128]
   dense_units: 64
+  use_gender: false
 
 training:
-  epochs: 30
-  patience: 5
+  epochs: 70
+  patience: 9
   loss: "huber"
   huber_delta: 10.0
   save_dir: "experiments/checkpoints"
   results_csv: "experiments/train_results_summary.csv"
   optimizer:
-    learning_rate: 0.01
+    learning_rate: 0.005
     beta_1: 0.9
     beta_2: 0.999
     epsilon: 1e-7
