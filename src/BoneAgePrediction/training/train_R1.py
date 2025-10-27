@@ -113,7 +113,7 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    )
    logger.info("Prepared training and validation ROI datasets from %s", data_path)
 
-   def _select_model_inputs(features, label):
+   def _select_model_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
       inputs = {
          "carpal": features["carpal"],
          "metaph": features["metaph"],

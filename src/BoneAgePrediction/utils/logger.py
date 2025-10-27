@@ -105,11 +105,20 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
       capture_logger.handlers.clear()
       capture_logger.addHandler(_FILE_HANDLER)
 
+      module_names = (
+         "keras.src.utils.io_utils",
+         "keras.utils.io_utils",
+         "tensorflow.keras.utils.io_utils",
+         "tensorflow.python.keras.utils.io_utils",
+      )
+
       targets: Sequence[Tuple[object, object]] = []
-      for module_name in ("tensorflow.keras.utils.io_utils", "keras.utils.io_utils"):
+      failures: list[tuple[str, Exception]] = []
+      for module_name in module_names:
          try:
             module = import_module(module_name)
-         except Exception:
+         except Exception as exc:
+            failures.append((module_name, exc))
             continue
 
          original = getattr(module, "print_msg", None)
@@ -118,7 +127,14 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
          targets.append((module, original))
 
       if not targets:
-         _MODULE_LOGGER.info("Unable to import Keras io_utils; skipping stdout mirroring.")
+         if failures:
+            details = ", ".join(f"{name}: {exc}" for name, exc in failures)
+            _MODULE_LOGGER.warning(
+               "Unable to import Keras io_utils modules (%s); skipping stdout mirroring.",
+               details,
+            )
+         else:
+            _MODULE_LOGGER.warning("Unable to import Keras io_utils; skipping stdout mirroring.")
          return
 
       primary_original = targets[0][1]

@@ -23,7 +23,6 @@ CONFIG_COLUMN_PREFIX = "cfg."
 SUMMARY_BASE_HEADER: List[str] = [
    "model_name",
    "num_params",
-   "gmacs",
    "avg_epoch_time_s",
    "train_mae",
    "train_rmse",

@@ -1,13 +1,13 @@
 data:
   data_path: "data/raw"
-  target_h: 512
-  target_w: 512
-  keep_aspect_ratio: true
+  target_h: 256
+  target_w: 256
+  keep_aspect_ratio: false
   pad_value: 0.0
   batch_size: 16
   clahe: false
-  augment: true
-  cache: true
+  augment: false
+  cache: false
 
 # ---------- ROI Locator/Extractor (R0)----------
 roi:
@@ -19,11 +19,11 @@ roi:
     epochs: 10
     learning_rate: 0.0005
   extractor:
-    roi_size: 256            # saved crop size (square)
+    roi_size: 128            # saved crop size (square)
     carpal_margin: 0.12      # extra border around peak box (fraction of shorter side)
     meta_mask_radius: 0.18   # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
     heatmap_threshold: 0.4   # minimal normalized CAM value to accept a peak
-    save_heatmaps: false     # set true to debug/inspect
+    save_heatmaps: true     # set true to debug/inspect
 
 # ---------- ROI regressors (R1) ----------
 model:
@@ -32,14 +32,14 @@ model:
   use_gender: false
 
 training:
-  epochs: 30
-  patience: 10
+  epochs: 50
+  patience: 9
   loss: "huber"
   huber_delta: 10.0
   save_dir: "experiments/checkpoints"
   results_csv: "experiments/train_results_summary.csv"
   optimizer:
-    learning_rate: 0.0003
+    learning_rate: 0.0005
     beta_1: 0.9
     beta_2: 0.999
     epsilon: 1e-7
