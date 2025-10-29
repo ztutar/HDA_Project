@@ -1,40 +1,60 @@
 from typing import Optional
 import argparse
 import os
+from dataclasses import asdict
+
 from BoneAgePrediction.training.train_B0 import train_GlobalCNN
 from BoneAgePrediction.training.train_R1 import train_ROI_CNN
-from BoneAgePrediction.utils.logger import get_logger, setup_logging
+from BoneAgePrediction.utils.logger import get_logger, setup_logging, mirror_keras_stdout_to_file
+from BoneAgePrediction.utils.config import load_config
+from BoneAgePrediction.utils.seeds import set_seeds
+from BoneAgePrediction.utils.path_manager import incremental_path
+
 
 # Map user-friendly aliases to canonical model metadata (name, trainer, default config)
 MODEL_REGISTRY = {
-   "globalcnn": ("GlobalCNN", train_GlobalCNN, "global_only.yaml"),
-   "b0": ("GlobalCNN", train_GlobalCNN, "global_only.yaml"),
-   "roi_cnn": ("ROI_CNN", train_ROI_CNN, "roi_only.yaml"),
-   "roicnn": ("ROI_CNN", train_ROI_CNN, "roi_only.yaml"),
-   "roi": ("ROI_CNN", train_ROI_CNN, "roi_only.yaml"),
-   "r1": ("ROI_CNN", train_ROI_CNN, "roi_only.yaml"),
+   "globalcnn": ("GlobalCNN", train_GlobalCNN),
+   "b0": ("GlobalCNN", train_GlobalCNN),
+   "roi_cnn": ("ROI_CNN", train_ROI_CNN),
+   "roicnn": ("ROI_CNN", train_ROI_CNN),
+   "roi": ("ROI_CNN", train_ROI_CNN),
+   "r1": ("ROI_CNN", train_ROI_CNN),
 }
 
 
 def main(model_name: str, config_path: Optional[str]) -> None:
    """
-   Main function to initiate training of the specified model with given configuration.
-   Args:
-      model_name: Name of the model to train (e.g., "GlobalCNN").
-      config_path: Path to the configuration file. If None, default settings are used.
+   Main function to    
    """
-   setup_logging(log_dir=os.path.join("experiments", "logs"))
+   # Check if the model is supported
    normalized_name = model_name.strip().lower()
-   logger = get_logger(__name__)
-
    if normalized_name not in MODEL_REGISTRY:
       logger.error("Model '%s' is not supported.", model_name)
       raise ValueError(f"Unsupported model: {model_name}")
+   
+   # Retrieve model name and training function
+   canonical_name, train_fn = MODEL_REGISTRY[normalized_name]
 
-   canonical_name, train_fn, default_config = MODEL_REGISTRY[normalized_name]
-   logger.info("Starting training for model: %s", canonical_name)
-
-   train_fn(config_path or default_config)
+   # Setup output directory for the experiment
+   config_filename = os.path.basename(config_path) if config_path else "default"
+   save_dir = incremental_path(
+      save_dir="experiments/checkpoints",
+      model_name=canonical_name,
+      config_name=os.path.splitext(config_filename)[0],
+   )
+   
+   # Setup logging
+   logger = setup_logging(log_dir=save_dir)
+   
+   # Load the configuration file or use default
+   config_bundle = load_config(config_path)
+      
+   # Set random seeds for reproducibility
+   set_seeds()
+   
+   # Start training
+   logger.info("Starting training for model: %s, using config: %s", canonical_name, config_filename)
+   train_fn(config_bundle, save_dir)
 
 
 if __name__ == "__main__":

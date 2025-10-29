@@ -9,13 +9,9 @@ forward pass consumes. The `EpochTimer` callback records the duration of each
 training epoch so that logs and reports can include timing information.
 """
 
-
-from typing import Dict, Tuple
 import time
-import numpy as np
 import tensorflow as tf
-from keras import layers, metrics, Model  
-
+from keras import metrics, Model  
 from BoneAgePrediction.utils.logger import get_logger  
 
 logger = get_logger(__name__)
