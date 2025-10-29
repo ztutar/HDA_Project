@@ -9,14 +9,13 @@ training components can request standardized loss objects.
 
 from typing import Literal
 from keras import losses
-
 from BoneAgePrediction.utils.logger import get_logger  
 
 logger = get_logger(__name__)
 
 LossName = Literal["huber", "mse", "mae"]
 
-def get_loss(loss_name: LossName = "huber", delta: float = 10.0) -> losses.Loss:
+def get_loss(loss_name: LossName = "huber", huber_delta: float = 10.0) -> losses.Loss:
    """Return a configured TensorFlow loss instance based on the requested name.
 
    Parameters:
@@ -38,7 +37,7 @@ def get_loss(loss_name: LossName = "huber", delta: float = 10.0) -> losses.Loss:
    loss_key = loss_name.lower()
    logger.info("Building loss function '%s'", loss_key)
    if loss_key == "huber":
-      return losses.Huber(delta=delta, name="huber")
+      return losses.Huber(delta=huber_delta, name="huber")
    elif loss_key == "mse":
       return losses.MeanSquaredError(name="mse")
    elif loss_key == "mae":

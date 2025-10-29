@@ -24,7 +24,7 @@ from BoneAgePrediction.models.R1_roi_cnn import build_ROI_CNN
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
 from BoneAgePrediction.training.callbacks import make_callbacks
-from BoneAgePrediction.training.summary import append_summary_row
+from BoneAgePrediction.training.summary import append_summary_row, NA_VALUE
 
 logger = get_logger(__name__)
 
@@ -226,13 +226,16 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    num_params = count_params(model)
    epoch_times = epoch_timer.epoch_times
    avg_epoch_time = np.mean(epoch_times) if epoch_times else None
-   print(f"[{model_name}] Number of Params: {num_params:,} Avg epoch time: {avg_epoch_time:.2f}s")
+   total_time = np.sum(epoch_times) if epoch_times else None
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
+   total_time_display = f"{total_time:.2f}" if total_time is not None else "n/a"
+   print(f"[{model_name}] Number of Params: {num_params:,} Avg epoch time: {avg_time_display}s")
    logger.info(
-      "[%s] Params: %d Avg epoch time: %s s",
+      "[%s] Params: %d Avg epoch time: %s s | Total training time: %s s",
       model_name,
       num_params,
       avg_time_display,
+      total_time_display,
    )
       
    # -----------------------
@@ -260,21 +263,34 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
       val_mae,
       val_rmse,
    )
-   
+
+   early_stop_cb = next((cb for cb in callbacks if isinstance(cb, keras.callbacks.EarlyStopping)), None)
+   early_stop_msg = NA_VALUE
+   restored_msg = NA_VALUE
+   if early_stop_cb is not None:
+      stopped_epoch = int(getattr(early_stop_cb, "stopped_epoch", 0) or 0)
+      if stopped_epoch > 0:
+         early_stop_msg = f"Epoch {stopped_epoch}: early stopping"
+         if getattr(early_stop_cb, "restore_best_weights", False) and best_epoch_idx is not None:
+            restored_msg = f"Restoring model weights from the end of the best epoch: {best_epoch_idx + 1}."
+
    summary_base = {
       "model_name": model_name,
       "num_params": num_params,
       "avg_epoch_time_s": avg_time_display,
+      "total_training_time_s": total_time_display,
       "train_mae": f"{train_mae:.4f}",
       "train_rmse": f"{train_rmse:.4f}",
       "val_mae": f"{val_mae:.4f}",
       "val_rmse": f"{val_rmse:.4f}",
+      "early_stopping_message": early_stop_msg,
+      "restored_weights_message": restored_msg,
+      "save_dir": save_dir,
    }
    append_summary_row(
       results_csv=results_csv,
       base_data=summary_base,
       config_bundle=config_bundle,
-      config_filename=config_filename,
    )
    logger.info("Appended training summary to %s", results_csv)
    

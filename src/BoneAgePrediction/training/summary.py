@@ -24,11 +24,15 @@ SUMMARY_BASE_HEADER: List[str] = [
    "model_name",
    "num_params",
    "avg_epoch_time_s",
+   "total_training_time_s",
    "train_mae",
    "train_rmse",
    "val_mae",
    "val_rmse",
+   "early_stopping_message",
+   "restored_weights_message",
    "config_file",
+   "save_dir",
 ]
 
 _DEFAULT_CONFIG_KEYS: List[str] | None = None
@@ -169,11 +173,18 @@ def _ensure_summary_structure(
    if "config_params" in existing_header:
       return _migrate_legacy_summary(results_csv, desired_keys)
 
+   base_len = len(SUMMARY_BASE_HEADER)
+   existing_base = existing_header[:base_len]
    existing_config_keys = [
       col[len(CONFIG_COLUMN_PREFIX):]
       for col in existing_header
       if col.startswith(CONFIG_COLUMN_PREFIX)
    ]
+
+   if existing_base != SUMMARY_BASE_HEADER:
+      merged_keys = sorted(set(existing_config_keys) | set(desired_keys))
+      _rewrite_summary_with_keys(results_csv, merged_keys)
+      return merged_keys
 
    config_keys = list(existing_config_keys)
    for key in desired_keys:
@@ -190,7 +201,6 @@ def append_summary_row(
    results_csv: str,
    base_data: Mapping[str, Any],
    config_bundle: ProjectConfig,
-   config_filename: str,
 ) -> None:
    """Append a training summary row with expanded configuration columns."""
    flattened_config = _flatten_mapping(config_bundle.raw or {})
@@ -202,7 +212,7 @@ def append_summary_row(
    base_row = []
    for key in SUMMARY_BASE_HEADER:
       if key == "config_file":
-         base_row.append(config_filename)
+         base_row.append(config_bundle.config_name)
       else:
          value = base_data.get(key, NA_VALUE)
          base_row.append(str(value))
