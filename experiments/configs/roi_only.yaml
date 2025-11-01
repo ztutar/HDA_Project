@@ -3,23 +3,18 @@ data:
   image_size: 256
   keep_aspect_ratio: false
   batch_size: 16
-  clahe: false
+  clahe: true
   augment: false
 
 # ---------- ROI Locator/Extractor (R0)----------
 roi:
   locator:
     roi_path: "data/processed/cropped_rois"  # where ROI crops will be saved
-    channels: [32, 64]
-    dense_units: 32
-    epochs: 20
-    learning_rate: 0.001
+    pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_01/GlobalCNN_best.keras" # model should be trained w/0 gender data
   extractor:
     roi_size: 128            # saved crop size (square)
-    carpal_margin: 0.12      # extra border around peak box (fraction of shorter side)
-    meta_mask_radius: 0.18   # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
-    heatmap_threshold: 0.4   # minimal normalized CAM value to accept a peak
-    save_heatmaps: true     # set true to debug/inspect
+    heatmap_threshold: 0.3   # minimal normalized CAM value to accept a peak
+    save_heatmaps: true     
 
 # ---------- ROI regressors (R1) ----------
 model:
@@ -28,8 +23,8 @@ model:
   use_gender: false
 
 training:
-  epochs: 50
-  patience: 9
-  learning_rate: 0.001
+  epochs: 70
+  patience: 10
+  learning_rate: 0.01
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"

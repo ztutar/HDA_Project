@@ -79,6 +79,7 @@ def make_dataset(
          (features, label):
             features = {
                "image":  tf.float32 [H,W,1],
+               "image_viz": tf.float32 [H,W,1],
                "gender": tf.int32   [],
                "image_id": tf.string []
             }
@@ -98,10 +99,12 @@ def make_dataset(
       if is_train and augment:
          image = _augment_image(image)  # data augmentation
       
+      image_viz = tf.clip_by_value(image, 0.0, 1.0) # for visualization values in [0,1]
       image = _zscore_norm(image)  # z-score normalization
          
       features = {
          "image": image, 
+         "image_viz": image_viz,
          "gender": tf.cast(gender, tf.int32),
          "image_id": img_id
       }
@@ -200,9 +203,15 @@ def make_roi_dataset(
       logger.info("%d ROI crops missing for %s split (examples: %s)", len(missing_images), split, missing_images[:5])
    if missing_coords:
       logger.info("%d ROI coords missing for %s split (examples: %s)", len(missing_coords), split, missing_coords[:5])
+      
+   if not carpal_paths:
+      raise FileNotFoundError(
+         f"No ROI crops found in {carpal_dir}. Regenerate crops before training the ROI model."
+      )
    
-   carpal_path_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_paths))   
-   metaph_path_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_paths))
+   
+   carpal_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(carpal_paths, dtype=tf.string))
+   metaph_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(metaph_paths, dtype=tf.string))
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
@@ -390,7 +399,7 @@ def _apply_clahe(image: tf.Tensor) -> tf.Tensor:
    image_uint8 = tf.squeeze(image_uint8, axis=-1)  # [H,W], uint8
    
    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8)) # create CLAHE object
-   def _clahe_apply(img_np):
+   def _clahe_apply(img_np: np.ndarray) -> np.ndarray:
       return clahe.apply(img_np)
    
    image_clahe = tf.numpy_function(func=_clahe_apply, inp=[image_uint8], Tout=tf.uint8) # [H,W], uint8
@@ -423,12 +432,12 @@ def _augment_image(image: tf.Tensor) -> tf.Tensor:
    """
    # random flips
    image = tf.image.random_flip_left_right(image)
-   # random rotations (~±5 degrees)
-   angle = tf.random.uniform([], minval=-5.0, maxval=5.0) * (np.pi / 180.0)  # Convert degrees to radians
+   # random rotations (~±2 degrees)
+   angle = tf.random.uniform([], minval=-2.0, maxval=2.0) * (np.pi / 180.0)  # Convert degrees to radians
    image = _image_rotate(image, angle)
    # brightness and contrast jitter
-   image = tf.image.random_brightness(image, max_delta=0.05)
-   image = tf.image.random_contrast(image, lower=0.95, upper=1.05)
+   image = tf.image.random_brightness(image, max_delta=0.02)
+   image = tf.image.random_contrast(image, lower=0.98, upper=1.02)
    return image
 
 def _image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:

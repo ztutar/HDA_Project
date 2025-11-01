@@ -3,23 +3,21 @@
 
 from typing import Tuple
 from dataclasses import asdict
-import logging
 import os
 import gc
+import io
+import glob 
 import numpy as np
 import tensorflow as tf
 import keras
 
-from BoneAgePrediction.utils.logger import get_logger, setup_logging, mirror_keras_stdout_to_file
-from BoneAgePrediction.utils.seeds import set_seeds
-from BoneAgePrediction.utils.config import load_config
-from BoneAgePrediction.utils.path_manager import incremental_path
+from BoneAgePrediction.utils.logger import get_logger, mirror_keras_stdout_to_file
+from BoneAgePrediction.utils.config import ProjectConfig
+from BoneAgePrediction.utils.dataset_loader import make_roi_dataset
 
-from BoneAgePrediction.data.dataset_loader import make_roi_dataset
+from BoneAgePrediction.roi.ROI_locator import train_locator_and_save_rois
 
-from BoneAgePrediction.roi.roi_locator import train_locator_and_save_rois
-
-from BoneAgePrediction.models.R1_roi_cnn import build_ROI_CNN
+from BoneAgePrediction.models.ROI_CNN import build_ROI_CNN
 
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
@@ -28,45 +26,38 @@ from BoneAgePrediction.training.summary import append_summary_row, NA_VALUE
 
 logger = get_logger(__name__)
 
-
-def _ensure_logging() -> None:
-   """Initialize logging to experiments/logs if no handlers configured yet."""
-   if not logging.getLogger().handlers:
-      setup_logging(log_dir=os.path.join("experiments", "logs"))
-   mirror_keras_stdout_to_file()
-
-
-def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.History]:
+def train_ROI_CNN(
+   config_bundle: ProjectConfig, 
+   save_dir: str
+) -> Tuple[keras.Model, keras.callbacks.History]:
+   
    #TODO: add docstring explanation for this function. write in details and explain each step
    """
    Orchestrate ROI-only training:
    1) Train a locator and generate ROI crops (if not already present).
    2) Train R1 ROI-only model on saved crops.
    """
-   
-   
+
+   mirror_keras_stdout_to_file()
+
    # -----------------------
    # Config & reproducibility
    # -----------------------
-   _ensure_logging()
-   config_bundle = load_config(config_path)
+   model_name = "ROI_CNN"
    data_cfg = config_bundle.data
-   
    roi_cfg = config_bundle.roi
    locator_cfg = roi_cfg.locator
-   extractor_cfg = roi_cfg.extractor
    
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
-   optimizer_cfg = training_cfg.optimizer
-   set_seeds()
    
-   config_filename = os.path.basename(config_path) if config_path else "default"
    config_dict = asdict(config_bundle)
-   model_name = "R1_ROI_CNN"
-   logger.info(f"Starting {model_name} training using config %s", config_filename)
-   logger.debug("Configuration parameters: %s", config_dict)
+   logger.info("Configuration parameters: %s", config_dict)
 
+   policy_name = "mixed_float16" 
+   if keras.mixed_precision.global_policy().name != policy_name:
+      keras.mixed_precision.set_global_policy(policy_name)
+      logger.info("Set mixed-precision policy to %s", policy_name)
 
    # -----------------------
    # ROI Locator & Extractor
@@ -74,34 +65,29 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    roi_path = locator_cfg.roi_path
    os.makedirs(roi_path, exist_ok=True)
 
-   # Generate crops for each split (train/val/test)
+   def _has_pngs(path: str) -> bool:
+      return os.path.isdir(path) and glob.glob(os.path.join(path, "*.png"))
+
+   # Generate crops for each split (train/val/test) if not already present
    for split in ["train", "validation", "test"]:
       split_dir = os.path.join(roi_path, split)
       carpal_dir = os.path.join(split_dir, "carpal")
       metaph_dir = os.path.join(split_dir, "metaph")
-      if not (os.path.exists(carpal_dir) and os.path.exists(metaph_dir)):
-         logger.info(f"[R1] Generating ROIs for {split} ...")
-         train_locator_and_save_rois(
-            config = config_bundle,
-            split = split,
-            out_root = roi_path,
-            save_heatmaps = bool(extractor_cfg.save_heatmaps, False),
-         )
-
+      if not (_has_pngs(carpal_dir) and _has_pngs(metaph_dir)):
+         logger.info("Generating ROIs for %s split into %s.", split, roi_path)
+         train_locator_and_save_rois(config=config_bundle, split=split, out_root=roi_path)
 
    # -----------------------
    # ROI Datasets
    # -----------------------
    data_path = data_cfg.data_path
    batch_size = data_cfg.batch_size
-   cache = data_cfg.cache
    
    train_ds = make_roi_dataset(
       data_path = data_path,
       roi_path = roi_path,
       split = 'train',
       batch_size = batch_size,
-      cache = cache,
    )
    
    val_ds = make_roi_dataset(
@@ -109,22 +95,23 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
       roi_path = roi_path,
       split = 'validation',
       batch_size = batch_size,
-      cache = cache,
    )
    logger.info("Prepared training and validation ROI datasets from %s", data_path)
 
-   def _select_model_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
+   use_gender = model_cfg.use_gender
+   def _select_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
       inputs = {
          "carpal": features["carpal"],
          "metaph": features["metaph"],
       }
-      if model_cfg.use_gender:
+      if use_gender:
          inputs["gender"] = tf.cast(features["gender"], tf.int32)
       return inputs, label
 
-   train_ds = train_ds.map(_select_model_inputs, num_parallel_calls=tf.data.AUTOTUNE)
-   val_ds = val_ds.map(_select_model_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   train_ds = train_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+
+   val_ds = val_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
    
    # Deduce ROI shape from one batch
@@ -136,7 +123,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    # -----------------------
    channels = model_cfg.channels
    dense_units = model_cfg.dense_units
-   use_gender = model_cfg.use_gender
    
    model = build_ROI_CNN(
       roi_shape=roi_shape,
@@ -145,37 +131,23 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
       use_gender=use_gender,
    )
    
-   logger.info(
-      "%s architecture: roi_shape=%s, channels=%s, dense_units=%d, use_gender=%s",
-      model_name,
-      channels,
-      dense_units,
-      use_gender,
-   )
-   
    # -----------------------
    # Optimizer (Adam, fixed LR)
    # -----------------------
-   learning_rate = optimizer_cfg.learning_rate
-   beta_1 = optimizer_cfg.beta_1 # Exponential decay rate for the 1st moment estimates.
-   beta_2 = optimizer_cfg.beta_2 # Exponential decay rate for the 2nd moment estimates.
-   epsilon = optimizer_cfg.epsilon # Small constant for numerical stability.
-   optimizer = keras.optimizers.Adam(
-      learning_rate=learning_rate,
-      beta_1=beta_1,
-      beta_2=beta_2,
-      epsilon=epsilon,
-   )
+   learning_rate = training_cfg.learning_rate
+   optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+   optimizer = keras.mixed_precision.LossScaleOptimizer(optimizer)
    
    # -----------------------
    # Loss & Metrics
    # -----------------------
    loss_name = training_cfg.loss
-   delta = training_cfg.huber_delta # only for Huber loss
+   huber_delta = 10     # only for Huber loss
    loss_fn = get_loss(
       loss_name=loss_name,
-      delta=delta,
+      huber_delta=huber_delta,
    )
+   metrics = [mae(), rmse()]
    
    # -----------------------
    # Compile model
@@ -183,18 +155,13 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    model.compile(
       optimizer=optimizer,
       loss=loss_fn,
-      metrics=[mae(), rmse()],
+      metrics=metrics,
    )
-   logger.info("Model compiled with %s loss", loss_name)
+   logger.info("Model compiled with %s loss and Adam optimizer (LR=%.6f)", loss_name, learning_rate)
    
    # -----------------------
    # Callbacks
    # -----------------------
-   save_dir = incremental_path(
-      save_dir=training_cfg.save_dir,
-      model_name=model_name,
-      config_name=os.path.splitext(config_filename)[0],
-   )
    patience = training_cfg.patience
    callbacks = make_callbacks(
       save_dir=save_dir,
@@ -203,6 +170,11 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    )
    epoch_timer = EpochTimer()
    callbacks.append(epoch_timer)
+   # learning rate schedule
+   reduce_lr = keras.callbacks.ReduceLROnPlateau(
+      monitor='val_mae', factor=0.1,
+      patience=4, min_lr=0.000001, verbose=1)
+   callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
    
    # -----------------------
@@ -219,7 +191,6 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    )
    logger.info("Training finished") 
 
-   
    # -----------------------
    # Complexity & Timing
    # -----------------------
@@ -229,14 +200,17 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    total_time = np.sum(epoch_times) if epoch_times else None
    avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
    total_time_display = f"{total_time:.2f}" if total_time is not None else "n/a"
-   print(f"[{model_name}] Number of Params: {num_params:,} Avg epoch time: {avg_time_display}s")
    logger.info(
-      "[%s] Params: %d Avg epoch time: %s s | Total training time: %s s",
+      "[%s] Params: %d | Avg epoch time: %s s" "| Total training time: %s s",
       model_name,
       num_params,
       avg_time_display,
       total_time_display,
    )
+
+   summary_stream = io.StringIO()
+   model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
+   logger.info("Model summary:\n%s", summary_stream.getvalue())
       
    # -----------------------
    # Summary CSV
@@ -245,16 +219,16 @@ def train_ROI_CNN(config_path: str) -> Tuple[keras.Model, keras.callbacks.Histor
    val_mae_history = history.history.get("val_mae", [])
    best_epoch_idx = int(np.argmin(val_mae_history)) if val_mae_history else None
 
-   def metric_at(name: str, idx: int, default: float = float("nan")) -> float:
+   def _metric_at(name: str, idx: int, default: float = float("nan")) -> float:
       series = history.history.get(name)
       if series is None or idx is None or idx >= len(series):
          return default
       return float(series[idx])
 
-   train_mae = metric_at("mae", best_epoch_idx)
-   train_rmse = metric_at("rmse", best_epoch_idx)
-   val_mae = metric_at("val_mae", best_epoch_idx)
-   val_rmse = metric_at("val_rmse", best_epoch_idx)
+   train_mae = _metric_at("mae", best_epoch_idx)
+   train_rmse = _metric_at("rmse", best_epoch_idx)
+   val_mae = _metric_at("val_mae", best_epoch_idx)
+   val_rmse = _metric_at("val_rmse", best_epoch_idx)
 
    logger.info(
       "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",

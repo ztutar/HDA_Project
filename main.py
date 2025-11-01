@@ -1,11 +1,10 @@
 from typing import Optional
 import argparse
 import os
-from dataclasses import asdict
 
-from BoneAgePrediction.training.train_B0 import train_GlobalCNN
-from BoneAgePrediction.training.train_R1 import train_ROI_CNN
-from BoneAgePrediction.utils.logger import get_logger, setup_logging, mirror_keras_stdout_to_file
+from BoneAgePrediction.training.train_GlobalCNN import train_GlobalCNN
+from BoneAgePrediction.training.train_ROI_CNN import train_ROI_CNN
+from BoneAgePrediction.utils.logger import setup_logging
 from BoneAgePrediction.utils.config import load_config
 from BoneAgePrediction.utils.seeds import set_seeds
 from BoneAgePrediction.utils.path_manager import incremental_path

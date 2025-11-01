@@ -9,26 +9,23 @@ from BoneAgePrediction.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
-                     channels: Sequence[int] = (32, 64, 128),
-                     dense_units: int = 64,
-                     use_gender: bool = False) -> Model:
+def build_GlobalCNN(
+   input_shape: Tuple[int, int, int] = (512, 512, 1),
+   channels: Sequence[int] = (32, 64, 128),
+   dense_units: int = 64,
+   use_gender: bool = False
+) -> Model:
    """
-   Builds a global CNN model for feature extraction.
-   
-   Architecture:
-      [ (Conv-BN-ReLU) x2 -> MaxPool ] * len(channels)
-      -> GlobalAveragePooling -> Dense(dense_units) -> Dense(1)
-   
+   Build the B0 Global CNN model for bone age prediction from full images.
    Args:
-      input_shape (Tuple[int, int, int], optional): Shape of the input image. Defaults to (512, 512, 1).
-      channels (Sequence[int], optional): Number of channels for each block. Defaults to (32, 64, 128).
-      dense_units (int, optional): Number of units in the dense layer before the output. Defaults to 64.
-   
+      input_shape (Tuple[int, int, int], optional): Input image shape. Defaults to (512, 512, 1).
+      channels (Sequence[int], optional): Conv channels per block. Defaults to (32, 64, 128).
+      dense_units (int, optional): Dense units before regression. Defaults to 64.
+      use_gender (bool, optional): If True, include gender embedding. Defaults to False.
    Returns:
-      Model: Compiled model mapping image -> age (months).
-                     Inputs:  image: float32 [B,H,W,1]
-                     Outputs: age  : float32 [B,1]
+      Model: Compiled model mapping images -> age (months).
+                  Inputs: {"image": [B,H,W,1], "gender": [B,]}
+                  Output: [B,1] age (months)
    """
    input_image = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
    
@@ -55,16 +52,16 @@ def build_GlobalCNN(input_shape: Tuple[int, int, int] = (512, 512, 1),
       gender_embed = layers.Flatten(name="gender_emb")(gender_embed) # [B,8]
       x = layers.Concatenate(name="features_with_gender")([x, gender_embed]) # [B,ch+8]
       inputs = [input_image, input_gender]
-      name = "B0_Global_CNN_with_gender"
+      name = "Global_CNN_with_gender"
       logger.info("Building GlobalCNN model with gender input.")
    else:
       inputs = [input_image]
-      name = "B0_Global_CNN"
+      name = "Global_CNN"
       logger.info("Building GlobalCNN model w/o gender input.")
    
    x = layers.Dropout(rate=0.2)(x) # [B,ch(+8)]
    x = layers.Dense(units=dense_units, activation='relu')(x) # [B,dense_units]
-   output_age = layers.Dense(units=1, activation='linear', name='age_months')(x) # [B,1]
+   output_age = layers.Dense(units=1, activation='linear', name='age_months', dtype=tf.float32)(x) # [B,1]
    
    model = Model(inputs=inputs, outputs=output_age, name=name)
    return model

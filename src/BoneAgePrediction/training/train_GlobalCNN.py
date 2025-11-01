@@ -3,8 +3,6 @@
 
 from typing import Tuple
 from dataclasses import asdict
-import logging
-import os
 import gc
 import io
 import numpy as np
@@ -13,10 +11,9 @@ import keras
 
 from BoneAgePrediction.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BoneAgePrediction.utils.config import ProjectConfig
+from BoneAgePrediction.utils.dataset_loader import make_dataset
 
-from BoneAgePrediction.data.dataset_loader import make_dataset
-
-from BoneAgePrediction.models.B0_global_cnn import build_GlobalCNN
+from BoneAgePrediction.models.Global_CNN import build_GlobalCNN
 
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
@@ -25,10 +22,13 @@ from BoneAgePrediction.training.summary import append_summary_row, NA_VALUE
 
 logger = get_logger(__name__)
 
-
-def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.Model, keras.callbacks.History]:
-   mirror_keras_stdout_to_file()
+def train_GlobalCNN(
+   config_bundle: ProjectConfig, 
+   save_dir: str
+) -> Tuple[keras.Model, keras.callbacks.History]:
    #TODO: add docstring explanation for this function. write in details and explain each step
+
+   mirror_keras_stdout_to_file()
    
    # -----------------------
    # Config & reproducibility
@@ -39,8 +39,14 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    training_cfg = config_bundle.training
    
    config_dict = asdict(config_bundle)
-   logger.debug("Configuration parameters: %s", config_dict)
-   
+   logger.info("Configuration parameters: %s", config_dict)
+
+   policy_name = "mixed_float16" 
+   if keras.mixed_precision.global_policy().name != policy_name:
+      keras.mixed_precision.set_global_policy(policy_name)
+      logger.info("Set mixed-precision policy to %s", policy_name)
+
+
    # -----------------------
    # Data
    # -----------------------
@@ -72,13 +78,21 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    )
    logger.info("Prepared training and validation datasets from %s", data_path)
 
-   def _select_image(features: dict, label: tf.Tensor):
+   use_gender = model_cfg.use_gender
+   def _select_inputs(features: dict, label: tf.Tensor):
+      if use_gender:
+         inputs = {
+               "image": features["image"],
+               "gender": tf.cast(features["gender"], tf.int32),
+         }
+         return inputs, label
       return features["image"], label
 
-   train_ds = train_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
+
+   train_ds = train_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
-   val_ds = val_ds.map(_select_image, num_parallel_calls=tf.data.AUTOTUNE)
+   val_ds = val_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
    
    # -----------------------
@@ -86,7 +100,6 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    # -----------------------
    channels = model_cfg.channels
    dense_units = model_cfg.dense_units
-   use_gender = model_cfg.use_gender
    input_shape = (image_size, image_size, 1)  # grayscale input
    
    model = build_GlobalCNN(
@@ -101,12 +114,13 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    # -----------------------
    learning_rate = training_cfg.learning_rate
    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+   optimizer = keras.mixed_precision.LossScaleOptimizer(optimizer)
    
    # -----------------------
    # Loss & Metrics
    # -----------------------
    loss_name = training_cfg.loss
-   huber_delta = 10 # only for Huber loss
+   huber_delta = 10     # only for Huber loss
    loss_fn = get_loss(
       loss_name=loss_name,
       huber_delta=huber_delta,
@@ -137,7 +151,7 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', factor=0.1,
-      patience=4, min_lr=0.0001, verbose=1)
+      patience=4, min_lr=0.00001, verbose=1)
    callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
    
@@ -183,16 +197,16 @@ def train_GlobalCNN(config_bundle: ProjectConfig, save_dir: str) -> Tuple[keras.
    val_mae_history = history.history.get("val_mae", [])
    best_epoch_idx = int(np.argmin(val_mae_history)) if val_mae_history else None
 
-   def metric_at(name: str, idx: int, default: float = float("nan")) -> float:
+   def _metric_at(name: str, idx: int, default: float = float("nan")) -> float:
       series = history.history.get(name)
       if series is None or idx is None or idx >= len(series):
          return default
       return float(series[idx])
 
-   train_mae = metric_at("mae", best_epoch_idx)
-   train_rmse = metric_at("rmse", best_epoch_idx)
-   val_mae = metric_at("val_mae", best_epoch_idx)
-   val_rmse = metric_at("val_rmse", best_epoch_idx)
+   train_mae = _metric_at("mae", best_epoch_idx)
+   train_rmse = _metric_at("rmse", best_epoch_idx)
+   val_mae = _metric_at("val_mae", best_epoch_idx)
+   val_rmse = _metric_at("val_rmse", best_epoch_idx)
 
    logger.info(
       "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",

@@ -1,105 +1,117 @@
+#TODO: add docstring explanation for this module. write in details and explain each function
+
+
 from typing import Optional
 import tensorflow as tf
-import numpy as np
 from keras import Model, layers
-from BoneAgePrediction.visualization.overlay import overlay_cam_on_image
 
 
 def compute_GradCAM(
          model: Model,
          image: tf.Tensor,
          target_layer_name: Optional[str] = None,
+         target_index: Optional[int] = None,
 ) -> tf.Tensor:
    """
-   Compute Grad-CAM (Gradient-weighted Class Activation Mapping) heatmap 
-   for a single image and a single-output regression model. 
-   Grad-CAM, helps to know which parts of the feature map contributed most 
-   to the model’s final prediction.
+   Compute a Grad-CAM (Gradient-weighted Class Activation Mapping) heatmap for
+   a single input according to the canonical Keras implementation.
 
    Args:
-      model (keras.Model): Trained Keras model mapping [B,H,W,C] -> [B,1].
-      image (tf.Tensor): Image tensor shape [H,W,C], float32.
+      model (keras.Model): Trained Keras model mapping [B,H,W,C] -> [B,K].
+      image (tf.Tensor): Image tensor of shape [H,W,C], dtype float32.
       target_layer_name (Optional[str]): Name of the last conv layer. If None,
-         use the last conv-like layer automatically.
+         automatically pick the last Conv2D layer.
+      target_index (Optional[int]): Index of the output neuron to explain. If None,
+         uses the argmax for multi-output models or 0 for single-output models.
 
    Returns:
-      tf.Tensor: Heatmap in [H,W] range [0,1], float32.
+      tf.Tensor: Heatmap tensor of shape [H,W] with values scaled to [0,1].
    """
-   
-   if image.ndim != 3:
-      raise ValueError("image must be [H,W,C]")
-   x = tf.expand_dims(image, axis=0) # -> [1, H, W, C] add batch dim for Keras
-   
-   # If a conv layer not given, walk layers from the end and
-   #  pick the last Conv2D (best spatial-semantic tradeoff).
+
+   image = tf.convert_to_tensor(image, dtype=tf.float32)
+   if image.shape.rank == 2:
+      image = image[..., tf.newaxis]
+   if image.shape.rank != 3:
+      raise ValueError("image must be [H,W,C] or [H,W].")
+
+   orig_hw = tf.shape(image)[0:2]
+
+   input_shape = model.input_shape
+   if isinstance(input_shape, list):
+      image_input_shape = next((shape for shape in input_shape if len(shape) == 4), None)
+   else:
+      image_input_shape = input_shape
+
+   if not image_input_shape or len(image_input_shape) != 4:
+      raise ValueError("Grad-CAM supports models with a single 4D image input.")
+
+   target_h, target_w, target_c = image_input_shape[1:]
+
+   if target_c and target_c != image.shape[-1]:
+      if target_c == 1 and image.shape[-1] == 3:
+         image = tf.image.rgb_to_grayscale(image)
+      elif target_c == 3 and image.shape[-1] == 1:
+         image = tf.image.grayscale_to_rgb(image)
+      else:
+         raise ValueError(f"Cannot adapt image channels from {image.shape[-1]} to {target_c}.")
+
+   if target_h and target_w:
+      image_for_model = tf.image.resize(image, size=(target_h, target_w), method="bilinear")
+   else:
+      image_for_model = image
+
+   img_batch = tf.expand_dims(image_for_model, axis=0)
+
    if target_layer_name is None:
       for layer in reversed(model.layers):
          if isinstance(layer, layers.Conv2D):
             target_layer_name = layer.name
             break
-         
+
    if target_layer_name is None:
       raise ValueError("No Conv2D layer found for Grad-CAM.")
-   
-   # Build a sub-model that outputs (feature_maps_of_target_layer, model_output)
+
    target_layer = model.get_layer(target_layer_name)
    grad_model = Model(
-      inputs=[model.inputs],
-      outputs=[target_layer.output, model.output]
+      inputs=model.inputs,
+      outputs=[target_layer.output, model.output],
    )
 
-   # Record operations in order to take gradients of the scalar output wrt conv features
    with tf.GradientTape() as tape:
-      conv_outputs, predictions = grad_model(x, training=False)   # conv_out: [1,h,w,c], preds: [1,1]
-      tape.watch(conv_outputs)                                    # tell tape to track conv_out
-      # For regression, use the scalar output directly
-      target = predictions[:, 0]                                  # regression scalar y (age months)
-   
-   # Compute the gradient of the model's output wrt the feature maps of some conv layer.
-   # d(target)/d(conv_out): gradient tensor with same spatial & channel dims as conv_out
-   grads = tape.gradient(target, conv_outputs) # [1,H,W,C] - one gradient map per channel
-   
-   # For each channel in the conv layer, compute a single importance weight
-   # This is a global avg pooling (GAP) of the gradient over the spatial dimensions (H, W).
-   # These weights tell us how strongly each feature map channel influenced the output.
-   weights = tf.reduce_mean(grads, axis=(1,2), keepdims=True) # [1,1,1,C]
-   
-   # Weighted combination of feature maps (per-channel) and keep only positive evidence
-   heatmap = tf.nn.relu(tf.reduce_sum(weights * conv_outputs, axis=-1)) # [1,H,W] after sum over C
-   heatmap = tf.squeeze(heatmap, axis=0) # [H,W]
-   
-   # Normalize the heatmap to [0,1] for visualization stability
-   heatmap = heatmap - tf.reduce_min(heatmap)
-   denom = tf.reduce_max(heatmap)
-   heatmap = heatmap / (denom + 1e-8)
-   
-   # Resize heatmap back to input spatial size using bilinear interpolation
-   heatmap = tf.image.resize(heatmap[..., None], size=tf.shape(x)[1:3], method = "bilinear")
-   heatmap = tf.squeeze(heatmap, axis=-1) # [H,W]
+      conv_outputs, predictions = grad_model(img_batch, training=False)
+
+      if target_index is None:
+         if predictions.shape[-1] == 1:
+            target = predictions[:, 0]
+         else:
+            dynamic_index = tf.argmax(predictions[0])
+            target = tf.gather(predictions, dynamic_index, axis=1)
+      else:
+         target = predictions[:, target_index]
+
+   grads = tape.gradient(target, conv_outputs)
+   if grads is None:
+      raise ValueError("Could not compute gradients for Grad-CAM.")
+
+   pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+   conv_outputs = conv_outputs[0]
+
+   heatmap = tf.reduce_sum(conv_outputs * pooled_grads, axis=-1)
+   heatmap = tf.nn.relu(heatmap)
+
+   max_val = tf.reduce_max(heatmap)
+   if tf.equal(max_val, 0):
+      heatmap = tf.zeros_like(heatmap)
+   else:
+      heatmap /= max_val
+
+   model_hw = tf.shape(image_for_model)[0:2]
+   heatmap = tf.image.resize(heatmap[..., tf.newaxis], size=model_hw, method="bilinear")
+   heatmap = tf.squeeze(heatmap, axis=-1)
+
+   heatmap = tf.image.resize(heatmap[..., tf.newaxis], size=orig_hw, method="bilinear")
+   heatmap = tf.squeeze(heatmap, axis=-1)
+
    return heatmap
 
-def compute_GradCAM_overlay(
-   model: tf.keras.Model,
-   img: tf.Tensor,
-   target_layer_name: Optional[str] = None,
-   alpha: float = 0.35,
-   gamma: float = 1.0,
-   cmap_name: str = "jet") -> np.ndarray:
-   """
-   Compute Grad-CAM and return an RGB overlay using a colormap.
-
-   Args:
-      model: Trained regression model [B,H,W,C] -> [B,1].
-      img: Single image [H,W,C] float32.
-      target_layer_name: Conv layer to probe (auto-select if None).
-      alpha: Overlay opacity.
-      gamma: Gamma for base grayscale.
-      cmap_name: Matplotlib colormap, e.g., 'jet', 'magma', 'turbo'.
-
-   Returns:
-      np.ndarray: [H,W,3] uint8 overlay ready to save or display.
-   """
-   cam = compute_GradCAM(model, img, target_layer_name=target_layer_name)   # [H,W]
-   base = img[..., 0] if img.shape[-1] == 1 else tf.image.rgb_to_grayscale(img)[..., 0]
-   return overlay_cam_on_image(base, cam, alpha=alpha, gamma=gamma, cmap_name=cmap_name)
    
