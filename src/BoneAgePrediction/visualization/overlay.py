@@ -1,24 +1,11 @@
-# src/visualization/overlay.py
+#TODO: add docstring explanation for this module. write in details and explain each function
+
+
 from typing import Tuple
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
-def normalize_array(x: np.ndarray) -> np.ndarray:
-   """
-   Normalize any array to [0,1]. If constant, returns zeros.
-
-   Args:
-      x (np.ndarray): Arbitrary float array.
-
-   Returns:
-      np.ndarray: Same shape as input, scaled to [0,1].
-   """
-   x = x.astype(np.float32)
-   mn, mx = np.min(x), np.max(x)
-   if mx > mn:
-      return (x - mn) / (mx - mn + 1e-8)
-   return np.zeros_like(x, dtype=np.float32)
+import matplotlib.cm as cm
 
 def overlay_cam_on_image(
    gray_img: tf.Tensor | np.ndarray,
@@ -40,31 +27,44 @@ def overlay_cam_on_image(
    Returns:
       np.ndarray: [H,W,3] uint8 RGB image ready to save/show.
    """
-   # Convert to numpy
-   g = gray_img.numpy() if isinstance(gray_img, tf.Tensor) else gray_img
-   c = cam.numpy() if isinstance(cam, tf.Tensor) else cam
-   g = g.squeeze()  # [H,W]
-   if g.ndim != 2 or c.ndim != 2:
-      raise ValueError("Expected gray_img [H,W] or [H,W,1] and cam [H,W].")
+   gray = tf.convert_to_tensor(gray_img)
+   cam = tf.convert_to_tensor(cam, dtype=tf.float32)
 
-   # Normalize
-   g01 = normalize_array(g)
+   if gray.dtype.is_integer:
+      gray = tf.image.convert_image_dtype(gray, tf.float32)
+   else:
+      gray = tf.cast(gray, tf.float32)
+
+   if gray.shape.rank == 2:
+      gray = gray[..., tf.newaxis]
+   if gray.shape.rank != 3 or gray.shape[-1] not in (1, 3):
+      raise ValueError("gray_img must be [H,W] or [H,W,{1|3}].")
+
+   heatmap = tf.squeeze(cam)
+   if heatmap.shape.rank != 2:
+      raise ValueError("cam must be rank-2 heatmap [H,W].")
+
+   target_hw = tf.shape(gray)[0:2]
+   heatmap = tf.image.resize(
+      heatmap[..., tf.newaxis],
+      size=target_hw,
+      method="bilinear",
+   )
+   heatmap = tf.squeeze(heatmap, axis=-1)
+   heatmap = tf.clip_by_value(heatmap, 0.0, 1.0)
+
+   colormap = cm.get_cmap(cmap_name)
+   colormap_lut = tf.constant(colormap(np.arange(256))[:, :3], dtype=tf.float32)
+   heatmap_indices = tf.cast(tf.round(heatmap * 255.0), tf.int32)
+   heatmap_rgb = tf.gather(colormap_lut, heatmap_indices)  # [H,W,3]
+
+   base = gray if gray.shape[-1] == 3 else tf.repeat(gray, repeats=3, axis=-1)
    if gamma != 1.0:
-      g01 = np.power(np.clip(g01, 0.0, 1.0), gamma)
-   c01 = normalize_array(c)
+      base = tf.pow(tf.clip_by_value(base, 0.0, 1.0), gamma)
 
-   # Colorize heatmap 
-   cmap = plt.get_cmap(cmap_name)
-   cam_rgb01 = cmap(c01)[..., :3].astype(np.float32)  # [H,W,3] in [0,1]
-
-   # Grayscale to 3-ch
-   g_rgb01 = np.repeat(g01[..., None], 3, axis=-1)
-
-   # Per-pixel alpha scales with heat intensity
-   a = (c01[..., None] * float(alpha)).astype(np.float32)
-   out01 = (1.0 - a) * g_rgb01 + a * cam_rgb01
-   out01 = np.clip(out01, 0.0, 1.0)
-   return (out01 * 255.0).astype(np.uint8)
+   overlay = heatmap_rgb * float(alpha) + base
+   overlay = tf.clip_by_value(overlay, 0.0, 1.0)
+   return (overlay.numpy() * 255.0).astype(np.uint8)
 
 def show_cam_triptych(
    gray_img: tf.Tensor | np.ndarray,
@@ -89,7 +89,7 @@ def show_cam_triptych(
    g = g.squeeze()
 
    c = cam.numpy() if isinstance(cam, tf.Tensor) else cam
-   c01 = normalize_array(c)
+   c01 = _normalize_array(c)
 
    plt.figure(figsize=figsize)
    # Panel 1: grayscale
@@ -134,7 +134,7 @@ def save_triptych_png(
    g = gray_img.numpy() if isinstance(gray_img, tf.Tensor) else gray_img
    g = g.squeeze()
    c = cam.numpy() if isinstance(cam, tf.Tensor) else cam
-   c01 = normalize_array(c)
+   c01 = _normalize_array(c)
 
    fig = plt.figure(figsize=figsize)
    ax1 = fig.add_subplot(1, 3, 1)
@@ -149,3 +149,23 @@ def save_triptych_png(
    plt.tight_layout()
    fig.savefig(path, dpi=200, bbox_inches="tight")
    plt.close(fig)
+   
+   
+# -----------------------------
+# HELPER FUNCTIONS
+# -----------------------------
+def _normalize_array(x: np.ndarray) -> np.ndarray:
+   """
+   Normalize any array to [0,1]. If constant, returns zeros.
+
+   Args:
+      x (np.ndarray): Arbitrary float array.
+
+   Returns:
+      np.ndarray: Same shape as input, scaled to [0,1].
+   """
+   x = x.astype(np.float32)
+   mn, mx = np.min(x), np.max(x)
+   if mx > mn:
+      return (x - mn) / (mx - mn + 1e-8)
+   return np.zeros_like(x, dtype=np.float32)

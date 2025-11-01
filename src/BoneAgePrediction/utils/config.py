@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, get_args, get_origin
 import logging
 import yaml
-import json
 from BoneAgePrediction.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -25,11 +24,6 @@ CONFIG_BASE_DIR = Path("experiments/configs")
 
 @dataclass
 class DataConfig:
-   """
-   Configuration class for data handling parameters. 
-   Attributes:
-
-   """
    data_path: str = "data/raw"            # Default path to raw data
    image_size: int = 512                  # Target image size (square)
    keep_aspect_ratio: bool = True         # Whether to keep aspect ratio when resizing
@@ -54,10 +48,7 @@ class TrainingConfig:
 @dataclass
 class ROILocatorConfig:
    roi_path: str = "data/processed/cropped_rois"
-   channels: list[int] = field(default_factory=lambda: [32, 64, 128])
-   dense_units: int = 64
-   epochs: int = 10
-   learning_rate: float = 5e-4
+   pretrained_model_path: str = ""
 
 @dataclass
 class ROIExtractorConfig:

@@ -190,3 +190,5 @@ __pycache__/
 
 # ignore experiments/checkpoints folder
 experiments/checkpoints/*
+
+experiments/train_results_summary_old.csv

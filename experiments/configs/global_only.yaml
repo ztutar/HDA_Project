@@ -4,16 +4,16 @@ data:
   keep_aspect_ratio: false
   batch_size: 16
   clahe: true
-  augment: false
+  augment: true
 
 model:
   channels: [32, 64, 128]
   dense_units: 64
-  use_gender: false
+  use_gender: true
 
 training:
   epochs: 70
-  patience: 9
+  patience: 10
   learning_rate: 0.005
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"
