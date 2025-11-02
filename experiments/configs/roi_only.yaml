@@ -13,7 +13,7 @@ roi:
     pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_01/GlobalCNN_best.keras" # model should be trained w/0 gender data
   extractor:
     roi_size: 128            # saved crop size (square)
-    heatmap_threshold: 0.3   # minimal normalized CAM value to accept a peak
+    heatmap_threshold: 0.25   # minimal normalized CAM value to accept a peak
     save_heatmaps: true     
 
 # ---------- ROI regressors (R1) ----------
@@ -25,6 +25,6 @@ model:
 training:
   epochs: 70
   patience: 10
-  learning_rate: 0.01
+  learning_rate: 0.001
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"

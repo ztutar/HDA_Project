@@ -30,12 +30,12 @@ def build_ROI_CNN(
                   Output: [B,1] age (months)  
    """
    
-   inp_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
-   inp_metp = layers.Input(shape=roi_shape, name="metaph") # [B,H,W,1]
-   inputs = {"carpal": inp_carp, "metaph": inp_metp} 
+   input_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
+   input_metp = layers.Input(shape=roi_shape, name="metaph") # [B,H,W,1]
+   inputs = {"carpal": input_carp, "metaph": input_metp} 
 
-   feat_carp = ROI_CNN_head(inp_carp, channels, dense_units) # [B,dense_units]
-   feat_metp = ROI_CNN_head(inp_metp, channels, dense_units) # [B,dense_units]
+   feat_carp = ROI_CNN_head(input_carp, channels, dense_units) # [B,dense_units]
+   feat_metp = ROI_CNN_head(input_metp, channels, dense_units) # [B,dense_units]
 
    features = layers.Concatenate()([feat_carp, feat_metp]) # [B,dense_units*2]
    if use_gender:

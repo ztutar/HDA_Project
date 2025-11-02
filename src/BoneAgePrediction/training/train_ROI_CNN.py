@@ -172,7 +172,7 @@ def train_ROI_CNN(
    callbacks.append(epoch_timer)
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
-      monitor='val_mae', factor=0.1,
+      monitor='val_mae', factor=0.25,
       patience=4, min_lr=0.000001, verbose=1)
    callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
