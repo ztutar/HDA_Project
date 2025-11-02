@@ -137,8 +137,8 @@ def train_locator_and_save_rois(
                heatmap=cam,
                image=image_viz,
                roi_size=roi_size,
-               carpal_margin=0.45, # extra border around peak box (fraction of shorter side)
-               meta_mask_radius=0.25, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
+               carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
+               meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
                heatmap_threshold=heatmap_threshold,
          ) # Dict with "carpal" and "metaph" entries
          
