@@ -1,7 +1,7 @@
 data:
   data_path: "data/raw"
   image_size: 256
-  keep_aspect_ratio: false
+  keep_aspect_ratio: true
   batch_size: 16
   clahe: true
   augment: false
@@ -9,23 +9,26 @@ data:
 # ---------- ROI Locator/Extractor ----------
 roi:
   locator:
-    roi_path: "data/processed/cropped_rois"  # where ROI crops will be saved
+    roi_path: "data/processed/cropped_rois" # where ROI crops will be saved
     pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_01/GlobalCNN_best.keras" # model should be trained w/0 gender data
   extractor:
     roi_size: 128            # saved crop size (square)
     heatmap_threshold: 0.25   # minimal normalized CAM value to accept a peak
-    save_heatmaps: true     
+    save_heatmaps: true
 
-# ---------- ROI regressors ----------
+# ---------- Fusion Model ----------
 model:
+  global_channels: [32, 64, 128]
+  global_dense_units: 64
   roi_channels: [32, 64, 128]
   roi_dense_units: 64
+  fusion_dense_units: [128, 64]
   dropout_rate: 0.2
-  use_gender: false
+  use_gender: true
 
 training:
-  epochs: 70
+  epochs: 60
   patience: 10
-  learning_rate: 0.001
+  learning_rate: 1e-03
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"

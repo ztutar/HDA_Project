@@ -275,6 +275,156 @@ def make_roi_dataset(
    return dataset
 
 
+def make_fusion_dataset(
+   data_path: str,
+   roi_path: str,
+   split: str = "train",
+   image_size: int = 512,
+   keep_aspect_ratio: bool = True,
+   batch_size: int = 16,
+   clahe: bool = False,
+   augment: bool = True,
+) -> tf.data.Dataset:
+   """
+   Build a tf.data pipeline yielding full images paired with ROI crops.
+   """
+   split_key = {"train": "train", "val": "validation", "validation": "validation", "test": "test"}[split.lower()]
+   image_dir = os.path.join(data_path, split_key)
+   labels_csv = os.path.join(data_path, f"{split_key}.csv")
+   carpal_dir = os.path.join(roi_path, split_key, "carpal")
+   metaph_dir = os.path.join(roi_path, split_key, "metaph")
+   coords_csv = os.path.join(roi_path, split_key, "roi_coords.csv")
+   logger.info("Preparing fusion dataset | split=%s", split_key)
+
+   rows = _read_csv_labels(labels_csv)
+   image_map = _build_id_to_path(image_dir)
+   carpal_map = _build_id_to_path(carpal_dir)
+   metaph_map = _build_id_to_path(metaph_dir)
+
+   coords_map = {}
+   if os.path.exists(coords_csv):
+      with open(coords_csv, newline="") as f:
+         reader = csv.DictReader(f)
+         for row in reader:
+            image_id = row.get("image_id")
+            if not image_id:
+               continue
+            try:
+               carpal_box = (
+                  int(row["carpal_y0"]), int(row["carpal_x0"]),
+                  int(row["carpal_y1"]), int(row["carpal_x1"])
+               )
+               metaph_box = (
+                  int(row["metaph_y0"]), int(row["metaph_x0"]),
+                  int(row["metaph_y1"]), int(row["metaph_x1"])
+               )
+            except (ValueError, KeyError) as exc:
+               logger.info("Skipping malformed ROI coords for %s: %s", image_id, exc)
+               continue
+            coords_map[image_id] = (carpal_box, metaph_box)
+   else:
+      logger.info("ROI coords file not found at %s", coords_csv)
+
+   image_paths, carpal_paths, metaph_paths = [], [], []
+   genders, ages, ids = [], [], []
+   carpal_boxes, metaph_boxes = [], []
+   missing_global, missing_rois = [], []
+
+   for row in rows:
+      image_id = row["image_id"]
+      image_path = image_map.get(image_id)
+      carpal_path = carpal_map.get(image_id)
+      metaph_path = metaph_map.get(image_id)
+
+      if image_path is None:
+         missing_global.append(image_id)
+         continue
+      if carpal_path is None or metaph_path is None:
+         missing_rois.append(image_id)
+         continue
+
+      coord_pair = coords_map.get(image_id, ((-1, -1, -1, -1), (-1, -1, -1, -1)))
+
+      image_paths.append(image_path)
+      carpal_paths.append(carpal_path)
+      metaph_paths.append(metaph_path)
+      genders.append(row["male"])
+      ages.append(row["age_months"])
+      ids.append(image_id)
+      carpal_boxes.append(coord_pair[0])
+      metaph_boxes.append(coord_pair[1])
+
+   if missing_global:
+      logger.info("%d full-hand images missing for %s split (examples: %s)", len(missing_global), split_key, missing_global[:5])
+   if missing_rois:
+      logger.info("%d ROI crops missing for %s split (examples: %s)", len(missing_rois), split_key, missing_rois[:5])
+
+   if not image_paths:
+      raise FileNotFoundError(
+         f"No fusion samples found in {image_dir}. Ensure full images and ROI crops are prepared."
+      )
+
+   image_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(image_paths, dtype=tf.string))
+   carpal_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(carpal_paths, dtype=tf.string))
+   metaph_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(metaph_paths, dtype=tf.string))
+   gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
+   age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
+   id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
+   carpal_box_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_boxes, dtype=np.int32))
+   metaph_box_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_boxes, dtype=np.int32))
+
+   dataset = tf.data.Dataset.zip(
+      (image_path_ds, carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds, carpal_box_ds, metaph_box_ds)
+   )
+   options = tf.data.Options()
+   options.experimental_deterministic = True
+   dataset = dataset.with_options(options)
+   is_train = split_key == "train"
+
+   def _load_sample(
+      image_path: tf.Tensor,
+      carpal_path: tf.Tensor,
+      metaph_path: tf.Tensor,
+      gender: tf.Tensor,
+      age: tf.Tensor,
+      img_id: tf.Tensor,
+      carpal_box: tf.Tensor,
+      metaph_box: tf.Tensor,
+   ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
+      image = _read_image_grayscale(image_path)
+      if keep_aspect_ratio:
+         image, _ = _resize_with_letterbox(image, image_size)
+      else:
+         image, _ = _resize_without_ar(image, image_size)
+
+      if clahe:
+         image = _apply_clahe(image)
+      if is_train and augment:
+         image = _augment_image(image)
+
+      image_viz = tf.clip_by_value(image, 0.0, 1.0)
+      image = _zscore_norm(image)
+
+      carpal_img = _zscore_norm(_read_image_grayscale(carpal_path))
+      metaph_img = _zscore_norm(_read_image_grayscale(metaph_path))
+
+      features = {
+         "image": image,
+         "image_viz": image_viz,
+         "carpal": carpal_img,
+         "metaph": metaph_img,
+         "carpal_box": tf.cast(carpal_box, tf.int32),
+         "metaph_box": tf.cast(metaph_box, tf.int32),
+         "gender": tf.cast(gender, tf.int32),
+         "image_id": img_id,
+      }
+      return features, tf.cast(age, tf.float32)
+
+   dataset = dataset.map(_load_sample, num_parallel_calls=tf.data.AUTOTUNE)
+   dataset = dataset.batch(batch_size, drop_remainder=False)
+   dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+   return dataset
+
 # -----------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------

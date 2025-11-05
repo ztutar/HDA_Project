@@ -121,13 +121,15 @@ def train_ROI_CNN(
    # -----------------------
    # Model
    # -----------------------
-   channels = model_cfg.channels
-   dense_units = model_cfg.dense_units
+   channels = model_cfg.roi_channels
+   dense_units = model_cfg.roi_dense_units
+   dropout_rate = model_cfg.dropout_rate
    
    model = build_ROI_CNN(
       roi_shape=roi_shape,
       channels=channels,
       dense_units=dense_units,
+      dropout_rate=dropout_rate,
       use_gender=use_gender,
    )
    
@@ -172,8 +174,12 @@ def train_ROI_CNN(
    callbacks.append(epoch_timer)
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
-      monitor='val_mae', factor=0.25,
-      patience=4, min_lr=0.000001, verbose=1)
+      monitor='val_mae', 
+      factor=0.25,
+      patience=4, 
+      min_lr=1e-6, 
+      verbose=1
+   )
    callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
    
@@ -181,7 +187,7 @@ def train_ROI_CNN(
    # Train
    # -----------------------
    epochs = training_cfg.epochs
-   logger.info("Starting training for %d epochs", epochs)
+   logger.info("Starting ROICNN training for %d epochs", epochs)
    history = model.fit(
       train_ds,
       validation_data=val_ds,
