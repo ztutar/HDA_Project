@@ -1,19 +1,22 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
-
+#TODO: add docstring explanation for this module. Write in details and explain each function and class.
 
 from typing import Tuple
 from dataclasses import asdict
+import os
 import gc
 import io
+import glob
 import numpy as np
 import tensorflow as tf
 import keras
 
 from BoneAgePrediction.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BoneAgePrediction.utils.config import ProjectConfig
-from BoneAgePrediction.utils.dataset_loader import make_dataset
+from BoneAgePrediction.utils.dataset_loader import make_fusion_dataset
 
-from BoneAgePrediction.models.Global_CNN import build_GlobalCNN
+from BoneAgePrediction.roi.ROI_locator import train_locator_and_save_rois
+
+from BoneAgePrediction.models.Fusion_CNN import build_FusionCNN
 
 from BoneAgePrediction.training.losses import get_loss
 from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
@@ -22,33 +25,56 @@ from BoneAgePrediction.training.summary import append_summary_row, NA_VALUE
 
 logger = get_logger(__name__)
 
-def train_GlobalCNN(
-   config_bundle: ProjectConfig, 
+def train_FusionCNN(
+   config_bundle: ProjectConfig,
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   #TODO: add docstring explanation for this function. write in details and explain each step
-
-   mirror_keras_stdout_to_file()
    
+   #TODO: add docstring explanation for this function. write in details and explain each step
+   """
+   Train the Fusion CNN model end to end on full-hand images plus ROI crops.
+   """
+   mirror_keras_stdout_to_file()
+
    # -----------------------
    # Config & reproducibility
    # -----------------------
-   model_name = "GlobalCNN"
+   model_name = "FusionCNN"
    data_cfg = config_bundle.data
+   roi_cfg = config_bundle.roi
+   locator_cfg = roi_cfg.locator
+
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
-   
+
    config_dict = asdict(config_bundle)
    logger.info("Configuration parameters: %s", config_dict)
 
-   policy_name = "mixed_float16" 
+   policy_name = "mixed_float16"
    if keras.mixed_precision.global_policy().name != policy_name:
       keras.mixed_precision.set_global_policy(policy_name)
       logger.info("Set mixed-precision policy to %s", policy_name)
 
+   # -----------------------
+   # ROI Locator & Extractor
+   # -----------------------
+   roi_path = locator_cfg.roi_path
+   os.makedirs(roi_path, exist_ok=True)
+
+   def _has_pngs(path: str) -> bool:
+      return os.path.isdir(path) and glob.glob(os.path.join(path, "*.png"))
+
+   # Generate crops for each split (train/val/test) if not already present
+   for split in ["train", "validation", "test"]:
+      split_dir = os.path.join(roi_path, split)
+      carpal_dir = os.path.join(split_dir, "carpal")
+      metaph_dir = os.path.join(split_dir, "metaph")
+      if not (_has_pngs(carpal_dir) and _has_pngs(metaph_dir)):
+         logger.info("Generating ROIs for %s split into %s.", split, roi_path)
+         train_locator_and_save_rois(config=config_bundle, split=split, out_root=roi_path)
 
    # -----------------------
-   # Data
+   # Fusion Dataset
    # -----------------------
    data_path = data_cfg.data_path
    image_size = data_cfg.image_size
@@ -57,67 +83,80 @@ def train_GlobalCNN(
    clahe = data_cfg.clahe
    augment = data_cfg.augment
    
-   train_ds = make_dataset(
+   train_ds = make_fusion_dataset(
       data_path=data_path,
-      split='train',
+      roi_path=roi_path,
+      split="train",
       image_size=image_size,
       keep_aspect_ratio=keep_aspect_ratio,
       batch_size=batch_size,
       clahe=clahe,
       augment=augment,
    )
-   
-   val_ds = make_dataset(
-      data_path=data_path,
-      split='val',
-      image_size=image_size,
-      keep_aspect_ratio=keep_aspect_ratio,
-      batch_size=batch_size,
-      clahe=clahe,
+
+   val_ds = make_fusion_dataset(
+      data_path=data_cfg.data_path,
+      roi_path=roi_path,
+      split="validation",
+      image_size=data_cfg.image_size,
+      keep_aspect_ratio=data_cfg.keep_aspect_ratio,
+      batch_size=data_cfg.batch_size,
+      clahe=data_cfg.clahe,
       augment=False,
    )
-   logger.info("Prepared training and validation datasets from %s", data_path)
+   logger.info("Prepared fusion training and validation datasets from %s", data_cfg.data_path)
 
    use_gender = model_cfg.use_gender
-   def _select_inputs(features: dict, label: tf.Tensor):
+   def _select_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
+      inputs = {
+         "image": features["image"],
+         "carpal": features["carpal"],
+         "metaph": features["metaph"],
+      }
       if use_gender:
-         inputs = {
-               "image": features["image"],
-               "gender": tf.cast(features["gender"], tf.int32),
-         }
-         return inputs, label
-      return features["image"], label
-
+         inputs["gender"] = tf.cast(features["gender"], tf.int32)
+      return inputs, label
 
    train_ds = train_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
-
+   
    val_ds = val_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
    val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
-   
+
+   # Deduce input shapes from one batch
+   sample_inputs, _ = next(iter(train_ds.take(1)))
+   global_input_shape = tuple(sample_inputs["image"].shape[1:])
+   roi_shape = tuple(sample_inputs["carpal"].shape[1:])
+
    # -----------------------
    # Model
    # -----------------------
-   channels = model_cfg.global_channels
-   dense_units = model_cfg.global_dense_units
+   global_channels = model_cfg.global_channels
+   global_dense_units = model_cfg.global_dense_units
+   roi_channels = model_cfg.roi_channels
+   roi_dense_units = model_cfg.roi_dense_units
+   fusion_dense_units = model_cfg.fusion_dense_units
    dropout_rate = model_cfg.dropout_rate
-   input_shape = (image_size, image_size, 1)  # grayscale input
-   
-   model = build_GlobalCNN(
-      input_shape=input_shape,
-      channels=channels,
-      dense_units=dense_units,
+
+   model = build_FusionCNN(
+      global_input_shape=global_input_shape,
+      roi_shape=roi_shape,
+      global_channels=global_channels,
+      roi_channels=roi_channels,
+      global_dense_units=global_dense_units,
+      roi_dense_units=roi_dense_units,
+      fusion_dense_units=fusion_dense_units,
       dropout_rate=dropout_rate,
       use_gender=use_gender,
    )
-   
+
    # -----------------------
    # Optimizer (Adam, fixed LR)
    # -----------------------
    learning_rate = training_cfg.learning_rate
    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
    optimizer = keras.mixed_precision.LossScaleOptimizer(optimizer)
-   
+
    # -----------------------
    # Loss & Metrics
    # -----------------------
@@ -128,17 +167,17 @@ def train_GlobalCNN(
       huber_delta=huber_delta,
    )
    metrics = [mae(), rmse()]
-   
+
    # -----------------------
    # Compile model
    # -----------------------
    model.compile(
-      optimizer=optimizer,
-      loss=loss_fn,
-      metrics=metrics,
+      optimizer=optimizer, 
+      loss=loss_fn, 
+      metrics=metrics
    )
    logger.info("Model compiled with %s loss and Adam optimizer (LR=%.6f)", loss_name, learning_rate)
-   
+
    # -----------------------
    # Callbacks
    # -----------------------
@@ -153,19 +192,19 @@ def train_GlobalCNN(
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
-      factor=0.1,
+      factor=0.25,
       patience=4, 
-      min_lr=1e-5, 
+      min_lr=1e-6, 
       verbose=1
    )
    callbacks.append(reduce_lr)
    logger.info("Configured training callbacks with patience: %d", patience)
-   
+
    # -----------------------
    # Train
    # -----------------------
    epochs = training_cfg.epochs
-   logger.info("Starting GlobalCNN training for %d epochs", epochs)
+   logger.info("Starting FusionCNN training for %d epochs", epochs)
    history = model.fit(
       train_ds,
       validation_data=val_ds,
@@ -174,7 +213,7 @@ def train_GlobalCNN(
       verbose=1,
    )
    logger.info("Training finished")
-   
+
    # -----------------------
    # Complexity & Timing
    # -----------------------
@@ -191,11 +230,11 @@ def train_GlobalCNN(
       avg_time_display,
       total_time_display,
    )
-   
+
    summary_stream = io.StringIO()
    model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
    logger.info("Model summary:\n%s", summary_stream.getvalue())
-   
+
    # -----------------------
    # Summary CSV
    # -----------------------
@@ -255,9 +294,9 @@ def train_GlobalCNN(
    # -----------------------
    # Cleanup
    # -----------------------
-   train_ds = val_ds = None  # drop strong refs before cleanup
+   train_ds = val_ds = None
    keras.backend.clear_session()
    gc.collect()
-   logger.info("Cleaned up session after training.")
-      
+   logger.info("Cleaned up session after training")
+
    return model, history

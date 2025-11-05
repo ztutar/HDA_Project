@@ -33,9 +33,13 @@ class DataConfig:
 
 @dataclass
 class ModelConfig:
-   channels: list[int] = field(default_factory=lambda: [32, 64, 128])
-   dense_units: int = 64
+   global_channels: list[int] = field(default_factory=lambda: [32, 64, 128])
+   global_dense_units: int = 128
+   roi_channels: list[int] = field(default_factory=lambda: [32, 64])
+   roi_dense_units: int = 32
+   fusion_dense_units: list[int] = field(default_factory=lambda: [256, 128])
    use_gender: bool = False
+   dropout_rate: float = 0.2
 
 @dataclass
 class TrainingConfig:
