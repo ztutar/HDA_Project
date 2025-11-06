@@ -8,6 +8,7 @@ import io
 import numpy as np
 import tensorflow as tf
 import keras
+import time
 
 from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
@@ -16,7 +17,7 @@ from BAP.utils.dataset_loader import make_dataset
 from BAP.models.Global_CNN import build_GlobalCNN
 
 from BAP.training.callbacks import make_callbacks
-from BAP.training.summary import append_summary_row, NA_VALUE
+from BAP.training.summary import append_summary_row
 
 logger = get_logger(__name__)
 
@@ -161,6 +162,7 @@ def train_GlobalCNN(
    # -----------------------
    epochs = training_cfg.epochs
    logger.info("Starting GlobalCNN training for %d epochs", epochs)
+   start_train = time.time()
    history = model.fit(
       train_ds,
       validation_data=val_ds,
@@ -169,21 +171,20 @@ def train_GlobalCNN(
       verbose=1,
    )
    logger.info("Training finished")
+   end_train = time.time()
    
    # -----------------------
    # Complexity & Timing
    # -----------------------
    num_params = int(model.count_params())
-   epoch_times = epoch_timer.epoch_times
-   avg_epoch_time = np.mean(epoch_times) if epoch_times else None
-   total_time = np.sum(epoch_times) if epoch_times else None
-   avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
-   total_time_display = f"{total_time:.2f}" if total_time is not None else "n/a"
+   training_time = end_train - start_train
+   num_epochs_ran = len(history.history.get("loss", []))
+   total_time_display = f"{training_time:.2f}" if training_time is not None else "n/a"
    logger.info(
-      "[%s] Params: %d | Avg epoch time: %s s" "| Total training time: %s s",
+      "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
       model_name,
       num_params,
-      avg_time_display,
+      num_epochs_ran,
       total_time_display,
    )
    
@@ -255,19 +256,12 @@ def train_GlobalCNN(
    )
 
    early_stop_cb = next((cb for cb in callbacks if isinstance(cb, keras.callbacks.EarlyStopping)), None)
-   early_stop_msg = NA_VALUE
-   restored_msg = NA_VALUE
    if early_stop_cb is not None:
       stopped_epoch = int(getattr(early_stop_cb, "stopped_epoch", 0) or 0)
-      if stopped_epoch > 0:
-         early_stop_msg = f"Epoch {stopped_epoch}: early stopping"
-         if getattr(early_stop_cb, "restore_best_weights", False) and best_epoch_idx is not None:
-            restored_msg = f"Restoring model weights from the end of the best epoch: {best_epoch_idx + 1}."
 
    summary_base = {
       "model_name": model_name,
       "num_params": num_params,
-      "avg_epoch_time_s": avg_time_display,
       "total_training_time_s": total_time_display,
       "train_mae": f"{train_mae:.4f}",
       "train_rmse": f"{train_rmse:.4f}",
@@ -275,8 +269,8 @@ def train_GlobalCNN(
       "val_rmse": f"{val_rmse:.4f}",
       "test_mae": f"{test_mae:.4f}",
       "test_rmse": f"{test_rmse:.4f}",
-      "early_stopping_message": early_stop_msg,
-      "restored_weights_message": restored_msg,
+      "stopped_epoch": stopped_epoch,
+      "best_epoch": best_epoch_idx,
       "save_dir": save_dir,
    }
    append_summary_row(

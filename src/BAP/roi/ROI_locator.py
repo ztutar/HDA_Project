@@ -5,6 +5,7 @@ from typing import Dict
 import os, csv
 import tensorflow as tf
 import keras
+import time
 
 from BAP.utils.dataset_loader import make_dataset
 from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
@@ -97,7 +98,6 @@ def train_locator_and_save_rois(
       split,
    )
 
-
    # --- Prepare output dirs
    carpal_dir = os.path.join(out_root, split, "carpal")
    metaph_dir = os.path.join(out_root, split, "metaph")
@@ -109,60 +109,52 @@ def train_locator_and_save_rois(
       os.makedirs(os.path.join(out_root, split, "heatmaps"), exist_ok=True)
 
    # --- Iterate once over split, save crops
-   coords_path = os.path.join(out_root, split, "roi_coords.csv")
-   with open(coords_path, "w", newline="") as f:
-      w = csv.writer(f)
-      w.writerow([
-         "image_id",
-         "carpal_y0","carpal_x0","carpal_y1","carpal_x1",
-         "metaph_y0","metaph_x0","metaph_y1","metaph_x1",
-      ])
-      for features, _ in ds.unbatch():
-         image = features["image"]                        # [H,W,1], float32
-         image_viz = features.get("image_viz", image)     # [H,W,1], float32 in [0,1]
-         image_id = features["image_id"]                  # [ ], string
-         
-         # Compute Grad-CAM on the locator
-         cam = compute_GradCAM(
-            model=roi_loc_model,
-            image=image,
-            target_layer_name=None,
-            target_index=0,
-         )  # [H,W] in [0,1]
-         
-         # Extract ROIs from the heatmap
-         roi_size=extractor_cfg.roi_size
-         heatmap_threshold=extractor_cfg.heatmap_threshold
-         rois = extract_rois_from_heatmap(
-               heatmap=cam,
-               image=image_viz,
-               roi_size=roi_size,
-               carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
-               meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
-               heatmap_threshold=heatmap_threshold,
-         ) # Dict with "carpal" and "metaph" entries
-         
-         # --- Use the true image_id from CSV (e.g., "4516")
-         img_id = image_id.numpy().decode("utf-8")
-         
-         # Save crops as {image_id}.png
-         _save_png(os.path.join(carpal_dir, f"{img_id}.png"), rois["carpal"]["crop"])
-         _save_png(os.path.join(metaph_dir, f"{img_id}.png"), rois["metaph"]["crop"])
+   for features, _ in ds.unbatch():
+      image = features["image"]                        # [H,W,1], float32
+      image_viz = features.get("image_viz", image)     # [H,W,1], float32 in [0,1]
+      image_id = features["image_id"]                  # [ ], string
+      
+      # Compute Grad-CAM on the locator
+      cam = compute_GradCAM(
+         model=roi_loc_model,
+         image=image,
+         target_layer_name=None,
+         target_index=0,
+      )  # [H,W] in [0,1]
+      
+      # Extract ROIs from the heatmap
+      roi_size=extractor_cfg.roi_size
+      heatmap_threshold=extractor_cfg.heatmap_threshold
+      rois = extract_rois_from_heatmap(
+            heatmap=cam,
+            image=image_viz,
+            roi_size=roi_size,
+            carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
+            meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
+            heatmap_threshold=heatmap_threshold,
+      ) # Dict with "carpal" and "metaph" entries
+      
+      # --- Use the true image_id from CSV (e.g., "4516")
+      img_id = image_id.numpy().decode("utf-8")
+      
+      # Save crops as {image_id}.png
+      _save_png(os.path.join(carpal_dir, f"{img_id}.png"), rois["carpal"]["crop"])
+      _save_png(os.path.join(metaph_dir, f"{img_id}.png"), rois["metaph"]["crop"])
 
-         # Optionally save heatmap overlay
-         if save_heatmaps:
-            overlay_rgb = overlay_cam_on_image(
-               gray_img=image_viz,
-               cam=cam,
-            )
-            _save_png(
-               os.path.join(out_root, split, "heatmaps", f"{img_id}.png"),
-               overlay_rgb,
-            )
+      # Optionally save heatmap overlay
+      if save_heatmaps:
+         overlay_rgb = overlay_cam_on_image(
+            gray_img=image_viz,
+            cam=cam,
+         )
+         _save_png(
+            os.path.join(out_root, split, "heatmaps", f"{img_id}.png"),
+            overlay_rgb,
+         )
 
-         (y0,x0,y1,x1)   = rois["carpal"]["box"]
-         (y0b,x0b,y1b,x1b) = rois["metaph"]["box"]
-         w.writerow([img_id, y0,x0,y1,x1, y0b,x0b,y1b,x1b])
+      (y0,x0,y1,x1)   = rois["carpal"]["box"]
+      (y0b,x0b,y1b,x1b) = rois["metaph"]["box"]
+
 
 def _save_png(path: str, img: tf.Tensor) -> None:
    """

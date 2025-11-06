@@ -75,8 +75,6 @@ class ProjectConfig:
    config_name: str = "default"
    raw: Dict[str, Any] = field(default_factory=dict)
    
-#TODO: Add EvaluationConfig dataclass and include it in ProjectConfig
-
 
 def load_config(path: Optional[str] = None) -> ProjectConfig:
    """

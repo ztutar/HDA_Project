@@ -147,34 +147,8 @@ def make_roi_dataset(
    # Build id -> path maps
    carpal_map = _build_id_to_path(carpal_dir)
    metaph_map = _build_id_to_path(metaph_dir)
-
-   # Load ROI coordinate annotations when available
-   coords_map = {}
-   if os.path.exists(coords_csv):
-      with open(coords_csv, newline="") as f:
-         reader = csv.DictReader(f)
-         for row in reader:
-            image_id = row.get("image_id")
-            if not image_id:
-               continue
-            try:
-               carpal_box = (
-                  int(row["carpal_y0"]), int(row["carpal_x0"]),
-                  int(row["carpal_y1"]), int(row["carpal_x1"])
-               )
-               metaph_box = (
-                  int(row["metaph_y0"]), int(row["metaph_x0"]),
-                  int(row["metaph_y1"]), int(row["metaph_x1"])
-               )
-            except (ValueError, KeyError) as exc:
-               logger.info("Skipping malformed ROI coords for %s: %s", image_id, exc)
-               continue
-            coords_map[image_id] = (carpal_box, metaph_box)
-   else:
-      logger.info("ROI coords file not found at %s", coords_csv)
    
    carpal_paths, metaph_paths, genders, ages, ids = [], [], [], [], []
-   carpal_boxes, metaph_boxes = [], []
    missing_images = []
    missing_coords = []
    for r in rows:
@@ -186,18 +160,11 @@ def make_roi_dataset(
          missing_images.append(image_id)
          continue
 
-      coord_pair = coords_map.get(image_id)
-      if coord_pair is None:
-         missing_coords.append(image_id)
-         coord_pair = ((-1, -1, -1, -1), (-1, -1, -1, -1))
-
       carpal_paths.append(carp)
       metaph_paths.append(metp)
       genders.append(r["male"])
       ages.append(r["age_months"])
       ids.append(image_id)
-      carpal_boxes.append(coord_pair[0])
-      metaph_boxes.append(coord_pair[1])
       
    if missing_images:
       logger.info("%d ROI crops missing for %s split (examples: %s)", len(missing_images), split, missing_images[:5])
@@ -209,18 +176,12 @@ def make_roi_dataset(
          f"No ROI crops found in {carpal_dir}. Regenerate crops before training the ROI model."
       )
    
-   
    carpal_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(carpal_paths, dtype=tf.string))
    metaph_path_ds = tf.data.Dataset.from_tensor_slices(tf.constant(metaph_paths, dtype=tf.string))
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
-   carpal_box_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_boxes, dtype=np.int32))
-   metaph_box_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_boxes, dtype=np.int32))
-   dataset = tf.data.Dataset.zip((carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds, carpal_box_ds, metaph_box_ds))
-   options = tf.data.Options()
-   options.experimental_deterministic = True
-   dataset = dataset.with_options(options)
+   dataset = tf.data.Dataset.zip((carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds))
       
    def _load_pair(
       carpal_path: tf.Tensor,
@@ -228,8 +189,6 @@ def make_roi_dataset(
       gender: tf.Tensor,
       age: tf.Tensor,
       img_id: tf.Tensor,
-      carpal_box: tf.Tensor,
-      metaph_box: tf.Tensor,
    ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       """
       Loads and preprocesses a single image and its label.
@@ -240,16 +199,12 @@ def make_roi_dataset(
          gender (tf.Tensor): tf.int32 scalar {0,1}.
          age (tf.Tensor): tf.float32 scalar (months).
          img_id (tf.Tensor): tf.string scalar, numeric ID from CSV (e.g., "4516").
-         carpal_box (tf.Tensor): tf.int32 tensor [4] with (y0,x0,y1,x1).
-         metaph_box (tf.Tensor): tf.int32 tensor [4] with (y0,x0,y1,x1).
 
       Returns:
          (features, label):
             features = {
                "carpal":     tf.float32 [H,W,1],
                "metaph":     tf.float32 [H,W,1],
-               "carpal_box": tf.int32   [4],
-               "metaph_box": tf.int32   [4],
                "gender":     tf.int32   [],
                "image_id":   tf.string []
             }
@@ -262,8 +217,6 @@ def make_roi_dataset(
       features = {
          "carpal": c_img, 
          "metaph": m_img,
-         "carpal_box": tf.cast(carpal_box, tf.int32),
-         "metaph_box": tf.cast(metaph_box, tf.int32),
          "gender": tf.cast(gender, tf.int32),
          "image_id": img_id
       }
@@ -301,33 +254,8 @@ def make_fusion_dataset(
    carpal_map = _build_id_to_path(carpal_dir)
    metaph_map = _build_id_to_path(metaph_dir)
 
-   coords_map = {}
-   if os.path.exists(coords_csv):
-      with open(coords_csv, newline="") as f:
-         reader = csv.DictReader(f)
-         for row in reader:
-            image_id = row.get("image_id")
-            if not image_id:
-               continue
-            try:
-               carpal_box = (
-                  int(row["carpal_y0"]), int(row["carpal_x0"]),
-                  int(row["carpal_y1"]), int(row["carpal_x1"])
-               )
-               metaph_box = (
-                  int(row["metaph_y0"]), int(row["metaph_x0"]),
-                  int(row["metaph_y1"]), int(row["metaph_x1"])
-               )
-            except (ValueError, KeyError) as exc:
-               logger.info("Skipping malformed ROI coords for %s: %s", image_id, exc)
-               continue
-            coords_map[image_id] = (carpal_box, metaph_box)
-   else:
-      logger.info("ROI coords file not found at %s", coords_csv)
-
    image_paths, carpal_paths, metaph_paths = [], [], []
    genders, ages, ids = [], [], []
-   carpal_boxes, metaph_boxes = [], []
    missing_global, missing_rois = [], []
 
    for row in rows:
@@ -343,16 +271,12 @@ def make_fusion_dataset(
          missing_rois.append(image_id)
          continue
 
-      coord_pair = coords_map.get(image_id, ((-1, -1, -1, -1), (-1, -1, -1, -1)))
-
       image_paths.append(image_path)
       carpal_paths.append(carpal_path)
       metaph_paths.append(metaph_path)
       genders.append(row["male"])
       ages.append(row["age_months"])
       ids.append(image_id)
-      carpal_boxes.append(coord_pair[0])
-      metaph_boxes.append(coord_pair[1])
 
    if missing_global:
       logger.info("%d full-hand images missing for %s split (examples: %s)", len(missing_global), split_key, missing_global[:5])
@@ -370,15 +294,8 @@ def make_fusion_dataset(
    gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
    age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
    id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
-   carpal_box_ds = tf.data.Dataset.from_tensor_slices(np.array(carpal_boxes, dtype=np.int32))
-   metaph_box_ds = tf.data.Dataset.from_tensor_slices(np.array(metaph_boxes, dtype=np.int32))
 
-   dataset = tf.data.Dataset.zip(
-      (image_path_ds, carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds, carpal_box_ds, metaph_box_ds)
-   )
-   options = tf.data.Options()
-   options.experimental_deterministic = True
-   dataset = dataset.with_options(options)
+   dataset = tf.data.Dataset.zip((image_path_ds, carpal_path_ds, metaph_path_ds, gender_ds, age_ds, id_ds))
    is_train = split_key == "train"
 
    def _load_sample(
@@ -388,8 +305,6 @@ def make_fusion_dataset(
       gender: tf.Tensor,
       age: tf.Tensor,
       img_id: tf.Tensor,
-      carpal_box: tf.Tensor,
-      metaph_box: tf.Tensor,
    ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
       image = _read_image_grayscale(image_path)
       if keep_aspect_ratio:
@@ -413,8 +328,6 @@ def make_fusion_dataset(
          "image_viz": image_viz,
          "carpal": carpal_img,
          "metaph": metaph_img,
-         "carpal_box": tf.cast(carpal_box, tf.int32),
-         "metaph_box": tf.cast(metaph_box, tf.int32),
          "gender": tf.cast(gender, tf.int32),
          "image_id": img_id,
       }
