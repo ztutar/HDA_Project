@@ -7,18 +7,10 @@ random number generators behave consistently across runs, which makes debugging
 and comparing results easier.
 """
 
-
-import logging
 import os
-import random
-import numpy as np
 import tensorflow as tf
 import keras
-
-try:
-   from BoneAgePrediction.utils.logger import get_logger  # type: ignore
-except ImportError:
-   get_logger = logging.getLogger  # type: ignore
+from BAP.utils.logger import get_logger  
 
 logger = get_logger(__name__)
 

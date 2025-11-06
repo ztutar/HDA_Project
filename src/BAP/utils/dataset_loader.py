@@ -12,7 +12,7 @@ import cv2
 from typing import Dict, Tuple, List
 import numpy as np
 import tensorflow as tf
-from BoneAgePrediction.utils.logger import get_logger   
+from BAP.utils.logger import get_logger   
 
 logger = get_logger(__name__)
    

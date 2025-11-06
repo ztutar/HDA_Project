@@ -5,8 +5,8 @@ from typing import Sequence, Tuple
 import tensorflow as tf
 from keras import layers, Model
 
-from BoneAgePrediction.models.ROI_CNN import ROI_CNN_head
-from BoneAgePrediction.utils.logger import get_logger
+from BAP.models.ROI_CNN import ROI_CNN_head
+from BAP.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

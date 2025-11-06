@@ -9,16 +9,14 @@ import numpy as np
 import tensorflow as tf
 import keras
 
-from BoneAgePrediction.utils.logger import get_logger, mirror_keras_stdout_to_file
-from BoneAgePrediction.utils.config import ProjectConfig
-from BoneAgePrediction.utils.dataset_loader import make_dataset
+from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
+from BAP.utils.config import ProjectConfig
+from BAP.utils.dataset_loader import make_dataset
 
-from BoneAgePrediction.models.Global_CNN import build_GlobalCNN
+from BAP.models.Global_CNN import build_GlobalCNN
 
-from BoneAgePrediction.training.losses import get_loss
-from BoneAgePrediction.training.metrics import mae, rmse, count_params, EpochTimer
-from BoneAgePrediction.training.callbacks import make_callbacks
-from BoneAgePrediction.training.summary import append_summary_row, NA_VALUE
+from BAP.training.callbacks import make_callbacks
+from BAP.training.summary import append_summary_row, NA_VALUE
 
 logger = get_logger(__name__)
 
@@ -122,12 +120,11 @@ def train_GlobalCNN(
    # Loss & Metrics
    # -----------------------
    loss_name = training_cfg.loss
-   huber_delta = 10     # only for Huber loss
-   loss_fn = get_loss(
-      loss_name=loss_name,
-      huber_delta=huber_delta,
-   )
-   metrics = [mae(), rmse()]
+   loss_fn = keras.losses.Huber(delta=10, name="huber")
+   metrics = [
+      keras.metrics.MeanAbsoluteError(name="mae"), 
+      keras.metrics.RootMeanSquaredError(name="rmse")
+   ]
    
    # -----------------------
    # Compile model
@@ -148,8 +145,6 @@ def train_GlobalCNN(
       model_name=model_name,
       patience=patience,
    )
-   epoch_timer = EpochTimer()
-   callbacks.append(epoch_timer)
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
@@ -178,7 +173,7 @@ def train_GlobalCNN(
    # -----------------------
    # Complexity & Timing
    # -----------------------
-   num_params = count_params(model)
+   num_params = int(model.count_params())
    epoch_times = epoch_timer.epoch_times
    avg_epoch_time = np.mean(epoch_times) if epoch_times else None
    total_time = np.sum(epoch_times) if epoch_times else None
@@ -195,6 +190,43 @@ def train_GlobalCNN(
    summary_stream = io.StringIO()
    model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
    logger.info("Model summary:\n%s", summary_stream.getvalue())
+   
+   # -----------------------
+   # Test Evaluation (optional)
+   # -----------------------
+   perform_test = getattr(training_cfg, "perform_test", False)
+   test_loss = float("nan")
+   test_mae = float("nan")
+   test_rmse = float("nan")
+   if perform_test:
+      logger.info("Evaluating %s on the test split.", model_name)
+      test_ds = make_dataset(
+         data_path=data_path,
+         split="test",
+         image_size=image_size,
+         keep_aspect_ratio=keep_aspect_ratio,
+         batch_size=batch_size,
+         clahe=clahe,
+         augment=False,
+      )
+      test_ds = test_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+      test_ds = test_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+      test_metrics = model.evaluate(test_ds, return_dict=True, verbose=1)
+      test_loss = float(test_metrics.get("loss", float("nan")))
+      test_mae = float(test_metrics.get("mae", float("nan")))
+      test_rmse = float(test_metrics.get("rmse", float("nan")))
+      logger.info(
+         "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
+         test_loss,
+         test_mae,
+         test_rmse,
+      )
+   else:
+      logger.info(
+         "Skipping test evaluation because training.perform_test is %s.",
+         perform_test,
+      )
+      test_ds = None
    
    # -----------------------
    # Summary CSV
@@ -241,6 +273,8 @@ def train_GlobalCNN(
       "train_rmse": f"{train_rmse:.4f}",
       "val_mae": f"{val_mae:.4f}",
       "val_rmse": f"{val_rmse:.4f}",
+      "test_mae": f"{test_mae:.4f}",
+      "test_rmse": f"{test_rmse:.4f}",
       "early_stopping_message": early_stop_msg,
       "restored_weights_message": restored_msg,
       "save_dir": save_dir,
@@ -255,7 +289,7 @@ def train_GlobalCNN(
    # -----------------------
    # Cleanup
    # -----------------------
-   train_ds = val_ds = None  # drop strong refs before cleanup
+   train_ds = val_ds = test_ds = None  # drop strong refs before cleanup
    keras.backend.clear_session()
    gc.collect()
    logger.info("Cleaned up session after training.")

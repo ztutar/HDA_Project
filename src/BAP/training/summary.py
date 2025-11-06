@@ -8,7 +8,7 @@ import csv
 import json
 import os
 
-from BoneAgePrediction.utils.config import (
+from BAP.utils.config import (
    DataConfig,
    ModelConfig,
    ProjectConfig,
@@ -29,6 +29,9 @@ SUMMARY_BASE_HEADER: List[str] = [
    "train_rmse",
    "val_mae",
    "val_rmse",
+   "test_loss",
+   "test_mae",
+   "test_rmse",
    "early_stopping_message",
    "restored_weights_message",
    "config_file",
