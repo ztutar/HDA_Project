@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, get_args, get_origin
 import logging
 import yaml
-from BoneAgePrediction.utils.logger import get_logger
+from BAP.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -48,6 +48,7 @@ class TrainingConfig:
    learning_rate: float = 0.0003
    loss: str = "huber"
    results_csv: str = "experiments/train_results_summary.csv"
+   perform_test: bool = False
 
 @dataclass
 class ROILocatorConfig:

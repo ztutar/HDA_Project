@@ -6,13 +6,13 @@ import os, csv
 import tensorflow as tf
 import keras
 
-from BoneAgePrediction.utils.dataset_loader import make_dataset
-from BoneAgePrediction.utils.logger import get_logger, mirror_keras_stdout_to_file
+from BAP.utils.dataset_loader import make_dataset
+from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 
-from BoneAgePrediction.visualization.gradcam import compute_GradCAM
-from BoneAgePrediction.visualization.overlay import overlay_cam_on_image
+from BAP.visualization.gradcam import compute_GradCAM
+from BAP.visualization.overlay import overlay_cam_on_image
 
-from BoneAgePrediction.roi.ROI_extract import extract_rois_from_heatmap
+from BAP.roi.ROI_extract import extract_rois_from_heatmap
 
 logger = get_logger(__name__)
 

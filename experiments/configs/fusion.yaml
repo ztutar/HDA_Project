@@ -1,7 +1,7 @@
 data:
   data_path: "data/raw"
   image_size: 256
-  keep_aspect_ratio: true
+  keep_aspect_ratio: false
   batch_size: 16
   clahe: true
   augment: false
@@ -32,3 +32,4 @@ training:
   learning_rate: 1e-03
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"
+  perform_test: true

@@ -5,7 +5,7 @@
 from typing import Sequence, Tuple
 import tensorflow as tf
 from keras import layers, Model
-from BoneAgePrediction.utils.logger import get_logger
+from BAP.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
