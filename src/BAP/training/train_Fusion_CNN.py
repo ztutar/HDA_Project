@@ -9,6 +9,7 @@ import glob
 import numpy as np
 import tensorflow as tf
 import keras
+import time
 
 from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
@@ -19,7 +20,7 @@ from BAP.roi.ROI_locator import train_locator_and_save_rois
 from BAP.models.Fusion_CNN import build_FusionCNN
 
 from BAP.training.callbacks import make_callbacks
-from BAP.training.summary import append_summary_row, NA_VALUE
+from BAP.training.summary import append_summary_row
 
 logger = get_logger(__name__)
 
@@ -63,13 +64,18 @@ def train_FusionCNN(
       return os.path.isdir(path) and glob.glob(os.path.join(path, "*.png"))
 
    # Generate crops for each split (train/val/test) if not already present
+   roi_extraction_time = 0.0
    for split in ["train", "validation", "test"]:
       split_dir = os.path.join(roi_path, split)
       carpal_dir = os.path.join(split_dir, "carpal")
       metaph_dir = os.path.join(split_dir, "metaph")
       if not (_has_pngs(carpal_dir) and _has_pngs(metaph_dir)):
          logger.info("Generating ROIs for %s split into %s.", split, roi_path)
+         roi_time_start = time.time()
          train_locator_and_save_rois(config=config_bundle, split=split, out_root=roi_path)
+         roi_time_end = time.time()
+         roi_extraction_time += roi_time_end - roi_time_start
+   logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
 
    # -----------------------
    # Fusion Dataset
@@ -200,6 +206,7 @@ def train_FusionCNN(
    # -----------------------
    epochs = training_cfg.epochs
    logger.info("Starting FusionCNN training for %d epochs", epochs)
+   start_train = time.time()
    history = model.fit(
       train_ds,
       validation_data=val_ds,
@@ -208,21 +215,20 @@ def train_FusionCNN(
       verbose=1,
    )
    logger.info("Training finished")
+   end_train = time.time()
 
    # -----------------------
    # Complexity & Timing
    # -----------------------
    num_params = int(model.count_params())
-   epoch_times = epoch_timer.epoch_times
-   avg_epoch_time = np.mean(epoch_times) if epoch_times else None
-   total_time = np.sum(epoch_times) if epoch_times else None
-   avg_time_display = f"{avg_epoch_time:.2f}" if avg_epoch_time is not None else "n/a"
-   total_time_display = f"{total_time:.2f}" if total_time is not None else "n/a"
+   training_time = end_train - start_train + roi_extraction_time
+   num_epochs_ran = len(history.history.get("loss", []))
+   total_time_display = f"{training_time:.2f}" if training_time is not None else "n/a"
    logger.info(
-      "[%s] Params: %d | Avg epoch time: %s s" "| Total training time: %s s",
+      "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
       model_name,
       num_params,
-      avg_time_display,
+      num_epochs_ran,
       total_time_display,
    )
 
@@ -295,19 +301,12 @@ def train_FusionCNN(
    )
 
    early_stop_cb = next((cb for cb in callbacks if isinstance(cb, keras.callbacks.EarlyStopping)), None)
-   early_stop_msg = NA_VALUE
-   restored_msg = NA_VALUE
    if early_stop_cb is not None:
       stopped_epoch = int(getattr(early_stop_cb, "stopped_epoch", 0) or 0)
-      if stopped_epoch > 0:
-         early_stop_msg = f"Epoch {stopped_epoch}: early stopping"
-         if getattr(early_stop_cb, "restore_best_weights", False) and best_epoch_idx is not None:
-            restored_msg = f"Restoring model weights from the end of the best epoch: {best_epoch_idx + 1}."
 
    summary_base = {
       "model_name": model_name,
       "num_params": num_params,
-      "avg_epoch_time_s": avg_time_display,
       "total_training_time_s": total_time_display,
       "train_mae": f"{train_mae:.4f}",
       "train_rmse": f"{train_rmse:.4f}",
@@ -315,8 +314,8 @@ def train_FusionCNN(
       "val_rmse": f"{val_rmse:.4f}",
       "test_mae": f"{test_mae:.4f}",
       "test_rmse": f"{test_rmse:.4f}",
-      "early_stopping_message": early_stop_msg,
-      "restored_weights_message": restored_msg,
+      "stopped_epoch": stopped_epoch,
+      "best_epoch": best_epoch_idx,
       "save_dir": save_dir,
    }
    append_summary_row(

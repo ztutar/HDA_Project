@@ -23,17 +23,15 @@ CONFIG_COLUMN_PREFIX = "cfg."
 SUMMARY_BASE_HEADER: List[str] = [
    "model_name",
    "num_params",
-   "avg_epoch_time_s",
    "total_training_time_s",
    "train_mae",
    "train_rmse",
    "val_mae",
    "val_rmse",
-   "test_loss",
    "test_mae",
    "test_rmse",
-   "early_stopping_message",
-   "restored_weights_message",
+   "stopped_epoch",
+   "best_epoch",
    "config_file",
    "save_dir",
 ]
@@ -78,6 +76,7 @@ def _get_default_config_keys() -> List[str]:
       )
       defaults_dict = asdict(defaults)
       defaults_dict.pop("raw", None)
+      defaults_dict.pop("config_name", None)
       _DEFAULT_CONFIG_KEYS = sorted(_flatten_mapping(defaults_dict).keys())
    return _DEFAULT_CONFIG_KEYS
 
