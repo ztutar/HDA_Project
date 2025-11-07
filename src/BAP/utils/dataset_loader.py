@@ -26,7 +26,7 @@ def make_dataset(
    keep_aspect_ratio=True, 
    batch_size: int = 16,
    clahe: bool = False,
-   augment: bool = True,
+   augment: bool = False,
 ) -> tf.data.Dataset:
    """
    Loads a TensorFlow dataset for bone age images and labels.
@@ -39,14 +39,14 @@ def make_dataset(
    csv_path = os.path.join(data_path, f"{split}.csv")
    logger.info("Preparing dataset | split=%s | image_path=%s", split, image_path)
    
-   rows = _read_csv_labels(csv_path)
-   id_to_path = _build_id_to_path(image_path)
+   rows = read_csv_labels(csv_path)
+   id_map = id_to_path(image_path)
    
    paths, genders, ages, ids = [], [], [], []
    missing = []
    for r in rows:
       image_id = r["image_id"]
-      p = id_to_path.get(image_id, None)
+      p = id_map.get(image_id, None)
       if p is None:
          missing.append(image_id)
          continue
@@ -85,7 +85,7 @@ def make_dataset(
             }
             label = tf.float32 []  # age in months
       """
-      image = _read_image_grayscale(path)  # [H,W,1], float32 in [0,1]
+      image = read_image_grayscale(path)  # [H,W,1], float32 in [0,1]
       
       if keep_aspect_ratio:
          image, _ = _resize_with_letterbox(image, image_size)
@@ -93,7 +93,7 @@ def make_dataset(
          image, _ = _resize_without_ar(image, image_size)
       
       if clahe:
-         image = _apply_clahe(image)  # CLAHE preprocessing
+         image = apply_clahe(image)  # CLAHE preprocessing
 
       is_train = split == "train"
       if is_train and augment:
@@ -138,15 +138,14 @@ def make_roi_dataset(
    split = {"train": "train", "val": "validation", "validation":"validation", "test": "test"}[split.lower()]
    carpal_dir = os.path.join(roi_path, split, "carpal")
    metaph_dir = os.path.join(roi_path, split, "metaph")
-   coords_csv = os.path.join(roi_path, split, "roi_coords.csv")
    
    # Expect original labels CSV from data_path
    labels_csv = os.path.join(data_path, f"{split}.csv")
-   rows = _read_csv_labels(labels_csv)
+   rows = read_csv_labels(labels_csv)
    
    # Build id -> path maps
-   carpal_map = _build_id_to_path(carpal_dir)
-   metaph_map = _build_id_to_path(metaph_dir)
+   carpal_map = id_to_path(carpal_dir)
+   metaph_map = id_to_path(metaph_dir)
    
    carpal_paths, metaph_paths, genders, ages, ids = [], [], [], [], []
    missing_images = []
@@ -211,8 +210,8 @@ def make_roi_dataset(
             label = tf.float32 []  # age in months
             Note: ROI boxes are (-1,-1,-1,-1) when coordinates are unavailable.
       """
-      c_img = _zscore_norm(_read_image_grayscale(carpal_path))  # [H,W,1], float32 in [0,1], z-score normalized
-      m_img = _zscore_norm(_read_image_grayscale(metaph_path))
+      c_img = _zscore_norm(read_image_grayscale(carpal_path))  # [H,W,1], float32 in [0,1], z-score normalized
+      m_img = _zscore_norm(read_image_grayscale(metaph_path))
          
       features = {
          "carpal": c_img, 
@@ -246,13 +245,12 @@ def make_fusion_dataset(
    labels_csv = os.path.join(data_path, f"{split_key}.csv")
    carpal_dir = os.path.join(roi_path, split_key, "carpal")
    metaph_dir = os.path.join(roi_path, split_key, "metaph")
-   coords_csv = os.path.join(roi_path, split_key, "roi_coords.csv")
    logger.info("Preparing fusion dataset | split=%s", split_key)
 
-   rows = _read_csv_labels(labels_csv)
-   image_map = _build_id_to_path(image_dir)
-   carpal_map = _build_id_to_path(carpal_dir)
-   metaph_map = _build_id_to_path(metaph_dir)
+   rows = read_csv_labels(labels_csv)
+   image_map = id_to_path(image_dir)
+   carpal_map = id_to_path(carpal_dir)
+   metaph_map = id_to_path(metaph_dir)
 
    image_paths, carpal_paths, metaph_paths = [], [], []
    genders, ages, ids = [], [], []
@@ -306,22 +304,22 @@ def make_fusion_dataset(
       age: tf.Tensor,
       img_id: tf.Tensor,
    ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
-      image = _read_image_grayscale(image_path)
+      image = read_image_grayscale(image_path)
       if keep_aspect_ratio:
          image, _ = _resize_with_letterbox(image, image_size)
       else:
          image, _ = _resize_without_ar(image, image_size)
 
       if clahe:
-         image = _apply_clahe(image)
+         image = apply_clahe(image)
       if is_train and augment:
          image = _augment_image(image)
 
       image_viz = tf.clip_by_value(image, 0.0, 1.0)
       image = _zscore_norm(image)
 
-      carpal_img = _zscore_norm(_read_image_grayscale(carpal_path))
-      metaph_img = _zscore_norm(_read_image_grayscale(metaph_path))
+      carpal_img = _zscore_norm(read_image_grayscale(carpal_path))
+      metaph_img = _zscore_norm(read_image_grayscale(metaph_path))
 
       features = {
          "image": image,
@@ -343,7 +341,7 @@ def make_fusion_dataset(
 # -----------------------------------------
 
 # ---------- CSV and file indexing helpers ----------
-def _read_csv_labels(csv_path: str) -> List[Dict]:
+def read_csv_labels(csv_path: str) -> List[Dict]:
    """
    Reads a CSV file with header: 'Image ID,male,Bone Age (months)'.
    Args:
@@ -363,28 +361,27 @@ def _read_csv_labels(csv_path: str) -> List[Dict]:
    logger.info("Loaded %d rows from %s", len(rows), csv_path)
    return rows
 
-def _build_id_to_path(image_dir: str) -> Dict[str, str]:
+def id_to_path(image_dir: str) -> Dict[str, str]:
    """
    Builds a mapping from image ID to full file path.
    'id' is the stem (filename without extension). e.g., '4360' -> '/.../4360.png'
    Args:
       image_dir (str): Directory containing images.
    Returns:
-      id_to_path (Dict[str, str]): Mapping from image ID to file path.
+      id_path_map (Dict[str, str]): Mapping from image ID to file path.
    """
    pattern = os.path.join(image_dir, "*.png")
-   logger = get_logger(__name__)
    files = glob.glob(pattern)
-   id_to_path = {}
+   id_path_map = {}
    for f in files:
       base = os.path.basename(f)
       image_id = os.path.splitext(base)[0]
-      id_to_path[image_id] = f
-   logger.debug("Indexed %d images in %s", len(id_to_path), image_dir)
-   return id_to_path
+      id_path_map[image_id] = f
+   logger.debug("Indexed %d images in %s", len(id_path_map), image_dir)
+   return id_path_map
 
 # ---------- Image processing helpers ----------
-def _read_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
+def read_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
    """
    Reads and preprocesses a grayscale image from a file path.
    Args:
@@ -449,7 +446,7 @@ def _resize_without_ar(img: tf.Tensor, image_size: int) -> Tuple[tf.Tensor, Dict
    meta = {"scale": None, "offset_y": 0., "offset_x": 0., "orig_h": tf.shape(img)[0], "orig_w": tf.shape(img)[1]}
    return img, meta
 
-def _apply_clahe(image: tf.Tensor) -> tf.Tensor:
+def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    """
    Applies CLAHE to a grayscale image tensor.
    image: float32 [0,1], shape [H,W,1] -> apply CLAHE in numpy (uint8) -> back to float32 [0,1]

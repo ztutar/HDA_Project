@@ -9,3 +9,5 @@ ipykernel
 matplotlib
 pyyaml
 pytest
+seaborn
+kagglehub[pandas-datasets]
