@@ -27,9 +27,9 @@ model:
   use_gender: true
 
 training:
-  epochs: 60
+  epochs: 70
   patience: 10
-  learning_rate: 1e-03
+  learning_rate: 0.003
   loss: "huber"
   results_csv: "experiments/train_results_summary.csv"
   perform_test: true
