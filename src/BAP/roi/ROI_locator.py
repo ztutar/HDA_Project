@@ -2,27 +2,31 @@
 
 
 from typing import Dict
-import os, csv
+import os
 import tensorflow as tf
 import keras
-import time
+from pathlib import Path
+import pandas as pd
 
 from BAP.utils.dataset_loader import make_dataset
-from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
+from BAP.utils.config import ProjectConfig
+
+#from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 
 from BAP.visualization.gradcam import compute_GradCAM
 from BAP.visualization.overlay import overlay_cam_on_image
 
 from BAP.roi.ROI_extract import extract_rois_from_heatmap
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 CHECKPOINTS_BASE_DIR = "experiments/checkpoints"
 
 def train_locator_and_save_rois(
-   config: Dict,
+   data_path: Path,
+   roi_paths: Dict,
+   config: ProjectConfig,
    split: str,
-   out_root: str,
 ) -> None:
    """
    Load a pretrained GlobalCNN, compute Grad-CAM per image to extract
@@ -39,7 +43,7 @@ def train_locator_and_save_rois(
       {out_root}/{split}/roi_coords.csv    # (image_id, y0,x0,y1,x1 for both ROIs)
    """
    
-   mirror_keras_stdout_to_file()
+   #mirror_keras_stdout_to_file()
    
    # -----------------------
    # Dataset for locator inference
@@ -49,23 +53,18 @@ def train_locator_and_save_rois(
    locator_cfg = roi_cfg.locator
    extractor_cfg = roi_cfg.extractor
    
-   data_path = data_cfg.data_path
    image_size = data_cfg.image_size
-   keep_aspect_ratio = data_cfg.keep_aspect_ratio
-   batch_size = data_cfg.batch_size
    clahe = data_cfg.clahe
    augment = data_cfg.augment
    
    ds = make_dataset(
-      data_path = data_path, 
-      split = split,
-      image_size = image_size,
-      keep_aspect_ratio = keep_aspect_ratio, 
-      batch_size = batch_size,
-      clahe = clahe,
-      augment = augment if split == "train" else False,
+      image_dir=data_path,
+      metadata=pd.read_csv(f"data/metadata/{split}.csv"),
+      image_size=image_size,
+      clahe=clahe,
+      augment=augment if split == "train" else False,
    )
-   logger.info("Created %s dataset for ROI locator from %s.", split, data_path) 
+   #logger.info("Created %s dataset for ROI locator from %s.", split, data_path) 
 
    # -----------------------
    # Model for ROI locator
@@ -83,51 +82,41 @@ def train_locator_and_save_rois(
 
    pretrained_model_path = os.path.normpath(pretrained_model_path)
    if not os.path.exists(pretrained_model_path):
-      raise FileNotFoundError(
-         f"Pretrained ROI locator weights not found at {pretrained_model_path} (from config value '{raw_model_path}')."
-      )
+      raise FileNotFoundError(f"Pretrained ROI locator weights not found at {pretrained_model_path} (from config value '{raw_model_path}').")
 
-   roi_loc_model = keras.models.load_model(
-      pretrained_model_path,
-      compile=False,
-   )
-   logger.info(
-      "Loaded pretrained GlobalCNN model for ROI locator from %s (config='%s', split=%s).",
-      pretrained_model_path,
-      raw_model_path,
-      split,
-   )
+   roi_loc_model = keras.models.load_model(pretrained_model_path, compile=False)
+   #logger.info(
+   #   "Loaded pretrained GlobalCNN model for ROI locator from %s (config='%s', split=%s).",
+   #   pretrained_model_path,
+   #   raw_model_path,
+   #   split,
+   #)
 
    # --- Prepare output dirs
-   carpal_dir = os.path.join(out_root, split, "carpal")
-   metaph_dir = os.path.join(out_root, split, "metaph")
+   carpal_dir = roi_paths["carpal"]
+   metaph_dir = roi_paths["metaph"]
    os.makedirs(carpal_dir, exist_ok=True)
    os.makedirs(metaph_dir, exist_ok=True)
    
    save_heatmaps = extractor_cfg.save_heatmaps
    if save_heatmaps:
-      os.makedirs(os.path.join(out_root, split, "heatmaps"), exist_ok=True)
+      heatmap_dir = roi_paths["heatmaps"]
+      os.makedirs(heatmap_dir, exist_ok=True)
 
    # --- Iterate once over split, save crops
-   for features, _ in ds.unbatch():
+   for features, _ in ds:
       image = features["image"]                        # [H,W,1], float32
-      image_viz = features.get("image_viz", image)     # [H,W,1], float32 in [0,1]
       image_id = features["image_id"]                  # [ ], string
       
       # Compute Grad-CAM on the locator
-      cam = compute_GradCAM(
-         model=roi_loc_model,
-         image=image,
-         target_layer_name=None,
-         target_index=0,
-      )  # [H,W] in [0,1]
+      cam = compute_GradCAM(model=roi_loc_model, image=image)  # [H,W] in [0,1]
       
       # Extract ROIs from the heatmap
       roi_size=extractor_cfg.roi_size
       heatmap_threshold=extractor_cfg.heatmap_threshold
       rois = extract_rois_from_heatmap(
             heatmap=cam,
-            image=image_viz,
+            image=image,
             roi_size=roi_size,
             carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
             meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
@@ -138,22 +127,14 @@ def train_locator_and_save_rois(
       img_id = image_id.numpy().decode("utf-8")
       
       # Save crops as {image_id}.png
-      _save_png(os.path.join(carpal_dir, f"{img_id}.png"), rois["carpal"]["crop"])
-      _save_png(os.path.join(metaph_dir, f"{img_id}.png"), rois["metaph"]["crop"])
+      _save_png(os.path.join(carpal_dir, f"{img_id}.png"), rois["carpal"])
+      _save_png(os.path.join(metaph_dir, f"{img_id}.png"), rois["metaph"])
 
       # Optionally save heatmap overlay
       if save_heatmaps:
-         overlay_rgb = overlay_cam_on_image(
-            gray_img=image_viz,
-            cam=cam,
-         )
-         _save_png(
-            os.path.join(out_root, split, "heatmaps", f"{img_id}.png"),
-            overlay_rgb,
-         )
+         overlay_rgb = overlay_cam_on_image(gray_img=image, cam=cam)
+         _save_png(os.path.join(heatmap_dir, f"{img_id}.png"), overlay_rgb)
 
-      (y0,x0,y1,x1)   = rois["carpal"]["box"]
-      (y0b,x0b,y1b,x1b) = rois["metaph"]["box"]
 
 
 def _save_png(path: str, img: tf.Tensor) -> None:

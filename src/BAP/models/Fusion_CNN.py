@@ -6,9 +6,9 @@ import tensorflow as tf
 from keras import layers, Model
 
 from BAP.models.ROI_CNN import ROI_CNN_head
-from BAP.utils.logger import get_logger
+#from BAP.utils.logger import get_logger
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 def build_FusionCNN(
    global_input_shape: Tuple[int, int, int] = (512, 512, 1),
@@ -46,10 +46,10 @@ def build_FusionCNN(
       fused = layers.Concatenate(name="fusion_concat_with_gender")([fused, gender_embedding]) # [B, global_dense_units + roi_dense_units*2 + 8]
       inputs["gender"] = gender_input 
       name = "Fusion_CNN_with_gender"
-      logger.info("Building Fusion CNN model with gender input.")
+      #logger.info("Building Fusion CNN model with gender input.")
    else:
       name = "Fusion_CNN"
-      logger.info("Building Fusion CNN model w/o gender input.")
+      #logger.info("Building Fusion CNN model w/o gender input.")
 
    x = fused
 
@@ -61,7 +61,7 @@ def build_FusionCNN(
    output = layers.Dense(units=1, activation="linear", name="age_months", dtype=tf.float32)(x) # [B,1]
 
    model = Model(inputs=inputs, outputs=output, name=name)
-   logger.info("Building Fusion CNN model%s.", " with gender input" if use_gender else "")
+   #logger.info("Building Fusion CNN model%s.", " with gender input" if use_gender else "")
    return model
 
 
