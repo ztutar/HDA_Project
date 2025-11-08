@@ -76,8 +76,8 @@ def extract_rois_from_heatmap(
    crop_b = tf.image.resize(image[y0_b:y1_b, x0_b:x1_b, :], size=(roi_size, roi_size), antialias=True)
    
    rois = {
-      "carpal": {"crop": tf.cast(crop_a, tf.float32), "box": (int(y0_a), int(x0_a), int(y1_a), int(x1_a))},
-      "metaph": {"crop": tf.cast(crop_b, tf.float32), "box": (int(y0_b), int(x0_b), int(y1_b), int(x1_b))}
+      "carpal": tf.cast(crop_a, tf.float32),
+      "metaph": tf.cast(crop_b, tf.float32)
    }
    return rois
 

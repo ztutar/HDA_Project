@@ -11,7 +11,6 @@ an ordered list ready to pass into `model.fit`.
 
 from typing import List
 import os
-import tensorflow as tf
 from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping, TensorBoard, CSVLogger
 
 

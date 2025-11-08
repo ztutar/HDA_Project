@@ -1,10 +1,8 @@
 data:
-  data_path: "data/raw"
   image_size: 256
-  keep_aspect_ratio: false
-  batch_size: 16
   clahe: true
   augment: false
+  batch_size: 16
 
 model:
   global_channels: [32, 64, 128]
@@ -16,6 +14,5 @@ training:
   epochs: 70
   patience: 10
   learning_rate: 0.005
-  loss: "huber"
   results_csv: "experiments/train_results_summary.csv"
   perform_test: true

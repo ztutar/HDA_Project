@@ -182,6 +182,7 @@ cython_debug/
 
 # ignore Bone Age Dataset folder
 data/*
+!data/metadata/
 
 .venv/
 __pycache__/
@@ -190,5 +191,3 @@ __pycache__/
 
 # ignore experiments/checkpoints folder
 experiments/checkpoints/*
-
-experiments/train_results_summary_old.csv

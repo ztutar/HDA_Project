@@ -4,9 +4,9 @@
 from typing import Sequence, Tuple
 import tensorflow as tf
 from keras import layers, Model
-from BAP.utils.logger import get_logger
+#from BAP.utils.logger import get_logger
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 def build_ROI_CNN(
    roi_shape: Tuple[int, int, int] = (224, 224, 1),
@@ -49,10 +49,10 @@ def build_ROI_CNN(
       features = layers.Concatenate(name="ROI_heads_concat_with_gender")([features, gender_emb]) # [B,dense_units*2+8]
       inputs["gender"] = inp_gender 
       name = "ROI_CNN_with_gender"
-      logger.info("Building ROI-CNN model with gender input.")
+      #logger.info("Building ROI-CNN model with gender input.")
    else:
       name = "ROI_CNN"
-      logger.info("Building ROI-CNN model w/o gender input.")
+      #logger.info("Building ROI-CNN model w/o gender input.")
 
    if dropout_rate > 0:
       x = layers.Dropout(rate=dropout_rate, name="dropout")(features) # [B,dense_units*2(+8)]

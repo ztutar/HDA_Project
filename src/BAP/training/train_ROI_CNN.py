@@ -5,14 +5,16 @@ from typing import Tuple
 from dataclasses import asdict
 import os
 import gc
-import io
+#import io
 import glob 
 import numpy as np
 import tensorflow as tf
 import keras
 import time
+import pandas as pd
+from pathlib import Path
 
-from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
+#from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_roi_dataset
 
@@ -23,21 +25,17 @@ from BAP.models.ROI_CNN import build_ROI_CNN
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 def train_ROI_CNN(
+   paths: dict,
    config_bundle: ProjectConfig, 
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
    
    #TODO: add docstring explanation for this function. write in details and explain each step
-   """
-   Orchestrate ROI-only training:
-   1) Train a locator and generate ROI crops (if not already present).
-   2) Train R1 ROI-only model on saved crops.
-   """
 
-   mirror_keras_stdout_to_file()
+   #mirror_keras_stdout_to_file()
 
    # -----------------------
    # Config & reproducibility
@@ -49,14 +47,11 @@ def train_ROI_CNN(
    
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
-   
-   config_dict = asdict(config_bundle)
-   logger.info("Configuration parameters: %s", config_dict)
 
    policy_name = "mixed_float16" 
    if keras.mixed_precision.global_policy().name != policy_name:
       keras.mixed_precision.set_global_policy(policy_name)
-      logger.info("Set mixed-precision policy to %s", policy_name)
+      #logger.info("Set mixed-precision policy to %s", policy_name)
 
    # -----------------------
    # ROI Locator & Extractor
@@ -69,38 +64,48 @@ def train_ROI_CNN(
 
    # Generate crops for each split (train/val/test) if not already present
    roi_extraction_time = 0.0
+   roi_paths = {}
    for split in ["train", "validation", "test"]:
-      split_dir = os.path.join(roi_path, split)
-      carpal_dir = os.path.join(split_dir, "carpal")
-      metaph_dir = os.path.join(split_dir, "metaph")
+      carpal_dir = os.path.join(roi_path, split, "carpal")
+      metaph_dir = os.path.join(roi_path, split, "metaph")
+      heatmaps_dir = os.path.join(roi_path, split, "heatmaps")
+      roi_paths[split] = {
+         "carpal": Path(carpal_dir), 
+         "metaph": Path(metaph_dir), 
+         "heatmaps": Path(heatmaps_dir)
+         }
       if not (_has_pngs(carpal_dir) and _has_pngs(metaph_dir)):
-         logger.info("Generating ROIs for %s split into %s.", split, roi_path)
+         #logger.info("Generating ROIs for %s split into %s.", split, roi_path)
          roi_time_start = time.time()
-         train_locator_and_save_rois(config=config_bundle, split=split, out_root=roi_path)
+         train_locator_and_save_rois(
+            data_path=paths[split], 
+            roi_paths=roi_paths[split],
+            config=config_bundle, 
+            split=split
+         )
          roi_time_end = time.time()
          roi_extraction_time += roi_time_end - roi_time_start
-   logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
+   #logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
 
    # -----------------------
    # ROI Datasets
    # -----------------------
-   data_path = data_cfg.data_path
-   batch_size = data_cfg.batch_size
+   train_roi_dir = roi_paths["train"]
+   val_roi_dir = roi_paths["validation"]
+   
+   train_metadata = pd.read_csv("data/metadata/train.csv")
+   val_metadata = pd.read_csv("data/metadata/validation.csv")
    
    train_ds = make_roi_dataset(
-      data_path = data_path,
-      roi_path = roi_path,
-      split = 'train',
-      batch_size = batch_size,
+      roi_dir=train_roi_dir,
+      metadata=train_metadata,
    )
    
    val_ds = make_roi_dataset(
-      data_path = data_path,
-      roi_path = roi_path,
-      split = 'validation',
-      batch_size = batch_size,
+      roi_dir=val_roi_dir,
+      metadata=val_metadata,
    )
-   logger.info("Prepared training and validation ROI datasets from %s", data_path)
+   #logger.info("Prepared training and validation ROI datasets from %s", data_path)
 
    use_gender = model_cfg.use_gender
    def _select_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
@@ -112,10 +117,13 @@ def train_ROI_CNN(
          inputs["gender"] = tf.cast(features["gender"], tf.int32)
       return inputs, label
 
+   batch_size = data_cfg.batch_size
    train_ds = train_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   train_ds = train_ds.batch(batch_size)
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
    val_ds = val_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   val_ds = val_ds.batch(batch_size)
    val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
    
    # Deduce ROI shape from one batch
@@ -147,7 +155,6 @@ def train_ROI_CNN(
    # -----------------------
    # Loss & Metrics
    # -----------------------
-   loss_name = training_cfg.loss
    loss_fn = keras.losses.Huber(delta=10, name="huber")
    metrics = [
       keras.metrics.MeanAbsoluteError(name="mae"), 
@@ -162,7 +169,7 @@ def train_ROI_CNN(
       loss=loss_fn,
       metrics=metrics,
    )
-   logger.info("Model compiled with %s loss and Adam optimizer (LR=%.6f)", loss_name, learning_rate)
+   #logger.info("Model compiled with %s loss and Adam optimizer (LR=%.6f)", loss_name, learning_rate)
    
    # -----------------------
    # Callbacks
@@ -182,13 +189,13 @@ def train_ROI_CNN(
       verbose=1
    )
    callbacks.append(reduce_lr)
-   logger.info("Configured training callbacks with patience: %d", patience)
+   #logger.info("Configured training callbacks with patience: %d", patience)
    
    # -----------------------
    # Train
    # -----------------------
    epochs = training_cfg.epochs
-   logger.info("Starting ROI-CNN training for %d epochs", epochs)
+   #logger.info("Starting ROI-CNN training for %d epochs", epochs)
    start_train = time.time()
    history = model.fit(
       train_ds,
@@ -197,7 +204,7 @@ def train_ROI_CNN(
       callbacks=callbacks,
       verbose=1,
    )
-   logger.info("Training finished") 
+   #logger.info("Training finished") 
    end_train = time.time()
 
    # -----------------------
@@ -207,50 +214,48 @@ def train_ROI_CNN(
    training_time = end_train - start_train + roi_extraction_time
    num_epochs_ran = len(history.history.get("loss", []))
    total_time_display = f"{training_time:.2f}" if training_time is not None else "n/a"
-   logger.info(
-      "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
-      model_name,
-      num_params,
-      num_epochs_ran,
-      total_time_display,
-   )
+   #logger.info(
+   #   "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
+   #   model_name,
+   #   num_params,
+   #   num_epochs_ran,
+   #   total_time_display,
+   #)
 
-   summary_stream = io.StringIO()
-   model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
-   logger.info("Model summary:\n%s", summary_stream.getvalue())
+   #summary_stream = io.StringIO()
+   #model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
+   #logger.info("Model summary:\n%s", summary_stream.getvalue())
    
    # -----------------------
    # Test Evaluation (optional)
    # -----------------------
-   perform_test = getattr(training_cfg, "perform_test", False)
-   test_loss = float("nan")
+   perform_test = training_cfg.perform_test
    test_mae = float("nan")
    test_rmse = float("nan")
    if perform_test:
-      logger.info("Evaluating %s on the test split.", model_name)
+      test_roi_dir = roi_paths["test"]
+      test_metadata = pd.read_csv("data/metadata/test.csv")
+      #logger.info("Evaluating %s on the test split.", model_name)
       test_ds = make_roi_dataset(
-         data_path=data_path,
-         roi_path=roi_path,
-         split="test",
-         batch_size=batch_size,
+         roi_dir=test_roi_dir,
+         metadata=test_metadata,
       )
       test_ds = test_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+      test_ds = test_ds.batch(batch_size)
       test_ds = test_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
       test_metrics = model.evaluate(test_ds, return_dict=True, verbose=1)
-      test_loss = float(test_metrics.get("loss", float("nan")))
       test_mae = float(test_metrics.get("mae", float("nan")))
       test_rmse = float(test_metrics.get("rmse", float("nan")))
-      logger.info(
-         "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
-         test_loss,
-         test_mae,
-         test_rmse,
-      )
+      #logger.info(
+      #   "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
+      #   test_mae,
+      #   test_rmse,
+      #)
    else:
-      logger.info(
-         "Skipping test evaluation because training.perform_test is %s.",
-         perform_test,
-      )
+      #logger.info(
+      #   "Skipping test evaluation because training.perform_test is %s.",
+      #   perform_test,
+      #)
       test_ds = None
       
    # -----------------------
@@ -260,28 +265,18 @@ def train_ROI_CNN(
    val_mae_history = history.history.get("val_mae", [])
    best_epoch_idx = int(np.argmin(val_mae_history)) if val_mae_history else None
 
-   def _metric_at(name: str, idx: int, default: float = float("nan")) -> float:
-      series = history.history.get(name)
-      if series is None or idx is None or idx >= len(series):
-         return default
-      return float(series[idx])
+   train_mae = history.history.get("mae", float("nan"))[best_epoch_idx]
+   train_rmse = history.history.get("rmse", float("nan"))[best_epoch_idx]
+   val_mae = history.history.get("val_mae", float("nan"))[best_epoch_idx]
+   val_rmse = history.history.get("val_rmse", float("nan"))[best_epoch_idx]
 
-   train_mae = _metric_at("mae", best_epoch_idx)
-   train_rmse = _metric_at("rmse", best_epoch_idx)
-   val_mae = _metric_at("val_mae", best_epoch_idx)
-   val_rmse = _metric_at("val_rmse", best_epoch_idx)
-
-   logger.info(
-      "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
-      train_mae,
-      train_rmse,
-      val_mae,
-      val_rmse,
-   )
-
-   early_stop_cb = next((cb for cb in callbacks if isinstance(cb, keras.callbacks.EarlyStopping)), None)
-   if early_stop_cb is not None:
-      stopped_epoch = int(getattr(early_stop_cb, "stopped_epoch", 0) or 0)
+   #logger.info(
+   #   "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
+   #   train_mae,
+   #   train_rmse,
+   #   val_mae,
+   #   val_rmse,
+   #)
 
    summary_base = {
       "model_name": model_name,
@@ -293,8 +288,8 @@ def train_ROI_CNN(
       "val_rmse": f"{val_rmse:.4f}",
       "test_mae": f"{test_mae:.4f}",
       "test_rmse": f"{test_rmse:.4f}",
-      "stopped_epoch": stopped_epoch,
-      "best_epoch": best_epoch_idx,
+      "stopped_epoch": num_epochs_ran,
+      "best_epoch": best_epoch_idx+1,
       "save_dir": save_dir,
    }
    append_summary_row(
@@ -302,7 +297,7 @@ def train_ROI_CNN(
       base_data=summary_base,
       config_bundle=config_bundle,
    )
-   logger.info("Appended training summary to %s", results_csv)
+   #logger.info("Appended training summary to %s", results_csv)
    
    # -----------------------
    # Cleanup
@@ -310,6 +305,6 @@ def train_ROI_CNN(
    train_ds = val_ds = test_ds = None  # drop strong refs before cleanup
    keras.backend.clear_session()
    gc.collect()
-   logger.info("Cleaned up after training")
+   #logger.info("Cleaned up after training")
       
    return model, history

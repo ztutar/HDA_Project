@@ -9,8 +9,6 @@ from keras import Model, layers
 def compute_GradCAM(
          model: Model,
          image: tf.Tensor,
-         target_layer_name: Optional[str] = None,
-         target_index: Optional[int] = None,
 ) -> tf.Tensor:
    """
    Compute a Grad-CAM (Gradient-weighted Class Activation Mapping) heatmap for
@@ -62,14 +60,11 @@ def compute_GradCAM(
 
    img_batch = tf.expand_dims(image_for_model, axis=0)
 
-   if target_layer_name is None:
-      for layer in reversed(model.layers):
-         if isinstance(layer, layers.Conv2D):
-            target_layer_name = layer.name
-            break
 
-   if target_layer_name is None:
-      raise ValueError("No Conv2D layer found for Grad-CAM.")
+   for layer in reversed(model.layers):
+      if isinstance(layer, layers.Conv2D):
+         target_layer_name = layer.name
+         break
 
    target_layer = model.get_layer(target_layer_name)
    grad_model = Model(
@@ -79,15 +74,11 @@ def compute_GradCAM(
 
    with tf.GradientTape() as tape:
       conv_outputs, predictions = grad_model(img_batch, training=False)
-
-      if target_index is None:
-         if predictions.shape[-1] == 1:
-            target = predictions[:, 0]
-         else:
-            dynamic_index = tf.argmax(predictions[0])
-            target = tf.gather(predictions, dynamic_index, axis=1)
+      if predictions.shape[-1] == 1:
+         target = predictions[:, 0]
       else:
-         target = predictions[:, target_index]
+         dynamic_index = tf.argmax(predictions[0])
+         target = tf.gather(predictions, dynamic_index, axis=1)
 
    grads = tape.gradient(target, conv_outputs)
    if grads is None:

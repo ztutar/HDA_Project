@@ -5,9 +5,9 @@
 from typing import Sequence, Tuple
 import tensorflow as tf
 from keras import layers, Model
-from BAP.utils.logger import get_logger
+#from BAP.utils.logger import get_logger
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 def build_GlobalCNN(
    input_shape: Tuple[int, int, int] = (512, 512, 1),
@@ -66,11 +66,11 @@ def build_GlobalCNN(
       x = layers.Concatenate(name="features_with_gender")([x, gender_embed]) # [B,ch+8]
       inputs = [input_image, input_gender]
       name = "Global_CNN_with_gender"
-      logger.info("Building GlobalCNN model with gender input.")
+      #logger.info("Building GlobalCNN model with gender input.")
    else:
       inputs = [input_image]
       name = "Global_CNN"
-      logger.info("Building GlobalCNN model w/o gender input.")
+      #logger.info("Building GlobalCNN model w/o gender input.")
    
    if dropout_rate > 0:
       x = layers.Dropout(rate=dropout_rate, name="dropout")(x) # [B,ch(+8)]

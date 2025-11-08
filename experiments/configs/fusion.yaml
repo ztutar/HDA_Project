@@ -1,10 +1,8 @@
 data:
-  data_path: "data/raw"
   image_size: 256
-  keep_aspect_ratio: false
-  batch_size: 16
   clahe: true
   augment: false
+  batch_size: 16
 
 # ---------- ROI Locator/Extractor ----------
 roi:
@@ -27,9 +25,8 @@ model:
   use_gender: true
 
 training:
-  epochs: 70
+  epochs: 5
   patience: 10
-  learning_rate: 0.003
-  loss: "huber"
+  learning_rate: 0.001
   results_csv: "experiments/train_results_summary.csv"
   perform_test: true

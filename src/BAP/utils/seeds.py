@@ -10,9 +10,9 @@ and comparing results easier.
 import os
 import tensorflow as tf
 import keras
-from BAP.utils.logger import get_logger  
+#from BAP.utils.logger import get_logger  
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
 
 def set_seeds(seed: int = 42):
    """
@@ -20,9 +20,9 @@ def set_seeds(seed: int = 42):
    Args:
       seed (int): The seed value to set. 
    """
-   logger.info("Setting random seeds to %d", seed)
+   #logger.info("Setting random seeds to %d", seed)
    os.environ['PYTHONHASHSEED'] = str(seed)
    keras.utils.set_random_seed(seed)
    tf.keras.utils.set_random_seed(seed)
    tf.config.experimental.enable_op_determinism()
-   logger.debug("Seeds applied to os.environ, random, numpy, tensorflow and keras.")
+   #logger.debug("Seeds applied to os.environ, random, numpy, tensorflow and keras.")
