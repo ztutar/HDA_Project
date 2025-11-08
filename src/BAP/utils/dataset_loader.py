@@ -5,9 +5,9 @@ This module brings together helpers for reading metadata from CSV files,
 linking those records to image files ...
 """
 
-import os
-import glob
-import csv
+#import os
+#import glob
+#import csv
 import cv2
 from typing import Dict, Tuple, List, Optional
 import numpy as np
@@ -60,7 +60,10 @@ def make_dataset(
          image = apply_clahe(image)
       if augment:
          image = _augment_image(image)
-      image = _zscore_norm(image)
+         
+      #image_viz = tf.clip_by_value(image, 0.0, 1.0)
+      image = tf.clip_by_value(image, 0.0, 1.0)
+      #image = _zscore_norm(image)
       features = {"image_id": image_id, "image": image, "gender": gender}
       return features, age
 
@@ -89,8 +92,8 @@ def make_roi_dataset(
    def _load_roi(image_id: tf.Tensor, age: tf.Tensor, gender: tf.Tensor):
       carpal_path = tf.strings.join([carpal_base, "/", image_id, ".png"])
       metaph_path = tf.strings.join([metaph_base, "/", image_id, ".png"])
-      carpal = load_image_grayscale(carpal_path)
-      metaph = load_image_grayscale(metaph_path)
+      carpal = _zscore_norm(load_image_grayscale(carpal_path))
+      metaph = _zscore_norm(load_image_grayscale(metaph_path))
       features = {
          "image_id": image_id,
          "carpal": carpal,
@@ -98,8 +101,9 @@ def make_roi_dataset(
          "gender": gender,
       }
       return features, age
-
-   return dataset.map(_load_roi, num_parallel_calls=tf.data.AUTOTUNE)
+   
+   dataset = dataset.map(_load_roi, num_parallel_calls=tf.data.AUTOTUNE)
+   return dataset
 
 # ---------- Fusion Dataset loader ----------
 def make_fusion_dataset(
@@ -171,7 +175,7 @@ def load_image_original(image_path: tf.Tensor) -> tf.Tensor:
    image = tf.io.read_file(image_path)
    image = tf.image.decode_png(image, channels=3)  # Original channels
    image = tf.image.convert_image_dtype(image, tf.float32)  # Convert to float32
-   return image # [H,W,1], float32 in [0,1]
+   return image # [H,W,3], float32 in [0,1]
 
 def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    """
