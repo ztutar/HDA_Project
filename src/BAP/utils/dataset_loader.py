@@ -9,22 +9,33 @@ import os
 import glob
 import csv
 import cv2
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 import numpy as np
 import tensorflow as tf
-from BAP.utils.logger import get_logger   
+import kagglehub
+from pathlib import Path
+#from BAP.utils.logger import get_logger   
 
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
+
+def get_rsna_dataset(force_download=False) -> dict[str, Path]:
+   root = Path(kagglehub.dataset_download("ipythonx/rsna-bone-age", force_download=force_download))
+   return {
+      "root": root,
+      "train": root / "RSNA_train/images",
+      "val": root / "RSNA_val/images",
+      "test": root / "RSNA_test/images",
+   }
    
 # ------------------------------------
 #  Dataset loader 
 # ------------------------------------
 def make_dataset(
-   data_path: str,
-   split: str = "train",
+   image_dir: str,
+   metadata: Optional[str] = None,
+   grayscale: bool = True,
+   resize: bool = True,
    image_size: int = 512,
-   keep_aspect_ratio=True, 
-   batch_size: int = 16,
    clahe: bool = False,
    augment: bool = False,
 ) -> tf.data.Dataset:
@@ -34,91 +45,41 @@ def make_dataset(
    Returns:
       tf.data.Dataset: A TensorFlow dataset yielding (image, label) pairs.  
    """
-   split = {"train": "train", "val": "validation", "validation":"validation", "test": "test"}[split.lower()]
-   image_path = os.path.join(data_path, split)
-   csv_path = os.path.join(data_path, f"{split}.csv")
-   logger.info("Preparing dataset | split=%s | image_path=%s", split, image_path)
-   
-   rows = read_csv_labels(csv_path)
-   id_map = id_to_path(image_path)
-   
-   paths, genders, ages, ids = [], [], [], []
-   missing = []
-   for r in rows:
-      image_id = r["image_id"]
-      p = id_map.get(image_id, None)
-      if p is None:
-         missing.append(image_id)
+   images = []
+   ages = []
+   genders = []
+   for _, row in metadata.iterrows():
+      image_id = row["Image ID"]
+      image_path = os.path.join(image_dir, f"{image_id}.png")
+      try:
+         if grayscale:
+            image = load_image_grayscale(image_path)
+         if resize:
+            image = tf.image.resize(image, (image_size, image_size), antialias=True)
+         if clahe:
+            image = apply_clahe(image)  # CLAHE preprocessing
+         if augment:
+            image = _augment_image(image)  # data augmentation
+         image = _zscore_norm(image)  # z-score normalization
+         images.append(image)
+         ages.append(row["Bone Age (months)"])
+         genders.append(row["male"])
+      except FileNotFoundError:
+         #logger.info(f"Skipping {image_path} due to missing file.")
+         print(f"Skipping {image_path} due to missing file.")
          continue
-      paths.append(p)
-      genders.append(r["male"])
-      ages.append(r["age_months"])
-      ids.append(image_id)
       
-   if len(missing) > 0:
-      logger.info("%d images not found in %s. examples=%s", len(missing), image_path, missing[:5])
-   logger.info("Dataset stats | files=%d | genders=%d | ages=%d", len(paths), len(genders), len(ages))
-   
-   path_ds = tf.data.Dataset.from_tensor_slices(np.array(paths))
-   gender_ds = tf.data.Dataset.from_tensor_slices(np.array(genders, dtype=np.int32))
-   age_ds = tf.data.Dataset.from_tensor_slices(np.array(ages, dtype=np.float32))
-   id_ds = tf.data.Dataset.from_tensor_slices(np.array(ids, dtype=np.str_))
-   dataset = tf.data.Dataset.zip((path_ds, gender_ds, age_ds, id_ds))
-      
-   def _load_and_preprocess(path: tf.Tensor, gender: tf.Tensor, age: tf.Tensor, img_id: tf.Tensor) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
-      """
-      Loads and preprocesses a single image and its label.
-
-      Args:
-         path (tf.Tensor): tf.string file path to image.
-         gender (tf.Tensor): tf.int32 scalar {0,1}.
-         age (tf.Tensor): tf.float32 scalar (months).
-         img_id (tf.Tensor): tf.string scalar, numeric ID from CSV (e.g., "4516").
-
-      Returns:
-         (features, label):
-            features = {
-               "image":  tf.float32 [H,W,1],
-               "image_viz": tf.float32 [H,W,1],
-               "gender": tf.int32   [],
-               "image_id": tf.string []
-            }
-            label = tf.float32 []  # age in months
-      """
-      image = read_image_grayscale(path)  # [H,W,1], float32 in [0,1]
-      
-      if keep_aspect_ratio:
-         image, _ = _resize_with_letterbox(image, image_size)
-      else:
-         image, _ = _resize_without_ar(image, image_size)
-      
-      if clahe:
-         image = apply_clahe(image)  # CLAHE preprocessing
-
-      is_train = split == "train"
-      if is_train and augment:
-         image = _augment_image(image)  # data augmentation
-      
-      image_viz = tf.clip_by_value(image, 0.0, 1.0) # for visualization values in [0,1]
-      image = _zscore_norm(image)  # z-score normalization
-         
-      features = {
-         "image": image, 
-         "image_viz": image_viz,
-         "gender": tf.cast(gender, tf.int32),
-         "image_id": img_id
-      }
-      return features, tf.cast(age, tf.float32)
-   
-   dataset = dataset.map(_load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
-   dataset = dataset.batch(batch_size, drop_remainder=False, num_parallel_calls=tf.data.AUTOTUNE)
-   dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+   image_ds = tf.data.Dataset.from_tensor_slices(tf.stack(images))
+   age_ds = tf.data.Dataset.from_tensor_slices(tf.constant(ages, dtype=tf.float32))
+   gender_ds = tf.data.Dataset.from_tensor_slices(tf.constant(genders, dtype=tf.int32))
+   dataset = tf.data.Dataset.zip((image_ds, age_ds, gender_ds))
    return dataset
 
 # ---------- ROI Dataset loader (load saved crops) ----------
 def make_roi_dataset(
-   data_path: str,
+   image_dir: str,
    roi_path: str,
+   metadata: Optional[str] = None,
    split: str = "train",
    batch_size: int = 16,
 ) -> tf.data.Dataset:
@@ -127,7 +88,8 @@ def make_roi_dataset(
    ({"carpal": img, "metaph": img, "gender": int32}, age_months)
 
    Args:
-      data_path (str): Root directory containing 'images/' and 'labels.csv'.
+      image_dir (str): Root directory containing the split image folders.
+      metadata (str | None): Directory containing split CSV metadata; defaults to image_dir.
       roi_path (str): Base dir with saved crops: {roi_root}/{split}/{carpal,metaph}/*.png
       split (str): 'train' | 'validation' | 'test'
       batch_size (int): Batch size.
@@ -139,8 +101,9 @@ def make_roi_dataset(
    carpal_dir = os.path.join(roi_path, split, "carpal")
    metaph_dir = os.path.join(roi_path, split, "metaph")
    
-   # Expect original labels CSV from data_path
-   labels_csv = os.path.join(data_path, f"{split}.csv")
+   # Expect original labels CSV from metadata (or image_dir fallback)
+   csv_root = metadata or image_dir
+   labels_csv = os.path.join(csv_root, f"{split}.csv")
    rows = read_csv_labels(labels_csv)
    
    # Build id -> path maps
@@ -210,8 +173,8 @@ def make_roi_dataset(
             label = tf.float32 []  # age in months
             Note: ROI boxes are (-1,-1,-1,-1) when coordinates are unavailable.
       """
-      c_img = _zscore_norm(read_image_grayscale(carpal_path))  # [H,W,1], float32 in [0,1], z-score normalized
-      m_img = _zscore_norm(read_image_grayscale(metaph_path))
+      c_img = _zscore_norm(load_image_grayscale(carpal_path))  # [H,W,1], float32 in [0,1], z-score normalized
+      m_img = _zscore_norm(load_image_grayscale(metaph_path))
          
       features = {
          "carpal": c_img, 
@@ -228,8 +191,9 @@ def make_roi_dataset(
 
 
 def make_fusion_dataset(
-   data_path: str,
+   image_dir: str,
    roi_path: str,
+   metadata: Optional[str] = None,
    split: str = "train",
    image_size: int = 512,
    keep_aspect_ratio: bool = True,
@@ -241,8 +205,9 @@ def make_fusion_dataset(
    Build a tf.data pipeline yielding full images paired with ROI crops.
    """
    split_key = {"train": "train", "val": "validation", "validation": "validation", "test": "test"}[split.lower()]
-   image_dir = os.path.join(data_path, split_key)
-   labels_csv = os.path.join(data_path, f"{split_key}.csv")
+   image_dir = os.path.join(image_dir, split_key)
+   csv_root = metadata or image_dir
+   labels_csv = os.path.join(csv_root, f"{split_key}.csv")
    carpal_dir = os.path.join(roi_path, split_key, "carpal")
    metaph_dir = os.path.join(roi_path, split_key, "metaph")
    logger.info("Preparing fusion dataset | split=%s", split_key)
@@ -304,11 +269,11 @@ def make_fusion_dataset(
       age: tf.Tensor,
       img_id: tf.Tensor,
    ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor]:
-      image = read_image_grayscale(image_path)
+      image = load_image_grayscale(image_path)
       if keep_aspect_ratio:
          image, _ = _resize_with_letterbox(image, image_size)
       else:
-         image, _ = _resize_without_ar(image, image_size)
+         image, _ = resize_image(image, image_size)
 
       if clahe:
          image = apply_clahe(image)
@@ -318,8 +283,8 @@ def make_fusion_dataset(
       image_viz = tf.clip_by_value(image, 0.0, 1.0)
       image = _zscore_norm(image)
 
-      carpal_img = _zscore_norm(read_image_grayscale(carpal_path))
-      metaph_img = _zscore_norm(read_image_grayscale(metaph_path))
+      carpal_img = _zscore_norm(load_image_grayscale(carpal_path))
+      metaph_img = _zscore_norm(load_image_grayscale(metaph_path))
 
       features = {
          "image": image,
@@ -381,70 +346,21 @@ def id_to_path(image_dir: str) -> Dict[str, str]:
    return id_path_map
 
 # ---------- Image processing helpers ----------
-def read_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
-   """
-   Reads and preprocesses a grayscale image from a file path.
-   Args:
-      image_path (tf.Tensor): Path to the image file.
-   Returns:
-      tf.Tensor: Preprocessed image tensor of shape (image_size, image_size, 1).
-   """
+def load_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
    image = tf.io.read_file(image_path)
    image = tf.image.decode_png(image, channels=1)  # Grayscale
    image = tf.image.convert_image_dtype(image, tf.float32)  # Convert to float32
    return image # [H,W,1], float32 in [0,1]
 
-def _resize_with_letterbox(img: tf.Tensor, image_size: int) -> Tuple[tf.Tensor, Dict]:
-   """
-   Resizes an image to fit within target_h x target_w while preserving aspect ratio.
-   Pads the image with pad_value to achieve exact target size.
-   Args:
-      img (tf.Tensor): Input image tensor of shape (H, W, C).
-      target_h (int): Target height.
-      target_w (int): Target width.
-      pad_value (float): Value to use for padding.
-   Returns:
-      tf.Tensor: Resized and padded image tensor of shape (target_h, target_w, C).
-      dict: Metadata including scale and offsets for potential CAM mapping.
-   """
-   h = tf.cast(tf.shape(img)[0], tf.float32)
-   w = tf.cast(tf.shape(img)[1], tf.float32)
-   scale = tf.minimum(image_size / h, image_size / w)
-   new_h = tf.cast(tf.round(h * scale), tf.int32)
-   new_w = tf.cast(tf.round(w * scale), tf.int32)
-   img = tf.image.resize(img, (new_h, new_w), antialias=True)
-   # pad to center
-   pad_h = image_size - new_h
-   pad_w = image_size - new_w
-   off_h = pad_h // 2
-   off_w = pad_w // 2
-   img = tf.image.pad_to_bounding_box(img, off_h, off_w, image_size, image_size)
-   if pad_h % 2 != 0 or pad_w % 2 != 0:
-      # ensure exact size if odd padding
-      img = tf.image.resize_with_crop_or_pad(img, image_size, image_size)
-   # return img and metadata useful for mapping CAMs back, if needed
-   meta = {
-      "scale": scale,
-      "offset_y": tf.cast(off_h, tf.float32),
-      "offset_x": tf.cast(off_w, tf.float32),
-      "orig_h": h, "orig_w": w
-   }
-   return img, meta
+def load_image_original(image_path: tf.Tensor) -> tf.Tensor:
+   image = tf.io.read_file(image_path)
+   image = tf.image.decode_png(image, channels=3)  # Original channels
+   image = tf.image.convert_image_dtype(image, tf.float32)  # Convert to float32
+   return image # [H,W,1], float32 in [0,1]
 
-def _resize_without_ar(img: tf.Tensor, image_size: int) -> Tuple[tf.Tensor, Dict]:
-   """
-   Resizes an image to target_h x target_w without preserving aspect ratio.
-   Args:
-      img (tf.Tensor): Input image tensor of shape (H, W, C).
-      target_h (int): Target height.
-      target_w (int): Target width.
-   Returns:
-      tf.Tensor: Resized image tensor of shape (target_h, target_w, C).
-      dict: Metadata with None scale and zero offsets.
-   """
-   img = tf.image.resize(img, (image_size, image_size), antialias=True)  # may distort
-   meta = {"scale": None, "offset_y": 0., "offset_x": 0., "orig_h": tf.shape(img)[0], "orig_w": tf.shape(img)[1]}
-   return img, meta
+def resize_image(img: tf.Tensor, image_size: int) -> Tuple[tf.Tensor, Dict]:
+   img = tf.image.resize(img, (image_size, image_size), antialias=True)
+   return img
 
 def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    """
