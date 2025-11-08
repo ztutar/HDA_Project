@@ -106,6 +106,7 @@ def train_locator_and_save_rois(
    # --- Iterate once over split, save crops
    for features, _ in ds:
       image = features["image"]                        # [H,W,1], float32
+      image_viz = features.get("image_viz", image)     # [H,W,1], float32 in [0,1]
       image_id = features["image_id"]                  # [ ], string
       
       # Compute Grad-CAM on the locator
