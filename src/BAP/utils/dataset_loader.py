@@ -61,10 +61,14 @@ def make_dataset(
       if augment:
          image = _augment_image(image)
          
-      #image_viz = tf.clip_by_value(image, 0.0, 1.0)
-      image = tf.clip_by_value(image, 0.0, 1.0)
-      #image = _zscore_norm(image)
-      features = {"image_id": image_id, "image": image, "gender": gender}
+      image_viz = tf.clip_by_value(image, 0.0, 1.0)
+      image = _zscore_norm(image)
+      features = {
+         "image_id": image_id, 
+         "image": image, 
+         "image_viz": image_viz,
+         "gender": gender,
+      }
       return features, age
 
    return dataset.map(_load_example, num_parallel_calls=tf.data.AUTOTUNE)

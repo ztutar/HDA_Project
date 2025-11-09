@@ -12,7 +12,7 @@ def extract_rois_from_heatmap(
    carpal_margin: float,
    meta_mask_radius: float,
    heatmap_threshold: float,
-) -> Dict[str, tf.Tensor]:
+   ) -> Dict[str, tf.Tensor]:
    """
    Given a Grad-CAM heatmap on the full image, extract two square ROI crops:
    1) Carpal (first/primary peak)
