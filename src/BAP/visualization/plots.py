@@ -291,3 +291,106 @@ def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
 
    plt.tight_layout()
    plt.show()
+
+
+def plot_best_epoch_metrics(
+   model_metrics_dict: Dict[str, Dict],
+   model_results_dict: Dict[str, Dict],
+   splits: Sequence[str] = ("train", "val", "test"),
+) -> None:
+   """
+   Compare loss and MAE scores (captured at each model's best epoch) across all splits.
+
+   Args:
+      model_metrics_dict (Dict[str, Dict]): Aggregated per-model metrics containing keys like
+         ``train_loss``, ``val_mae`` and ``test_mae`` that hold the score at the selected epoch.
+      model_results_dict (Dict[str, Dict]): Metadata per model with ``num_params`` and
+         ``training_time`` values to annotate the bars.
+      splits (Sequence[str]): Ordered sequence of split prefixes (e.g. ``train``) to include.
+   """
+
+   if not model_metrics_dict:
+      raise ValueError("model_metrics_dict must contain at least one model entry.")
+
+   model_names = [name for name in model_metrics_dict.keys() if name in model_results_dict]
+   if not model_names:
+      raise ValueError("No overlapping models found between metrics and results dictionaries.")
+
+   metrics_to_plot = ("loss", "mae")
+   num_models = len(model_names)
+   num_splits = len(splits)
+   x = np.arange(num_models)
+   width = 0.8 / max(num_splits, 1)
+   palette = sns.color_palette("tab10", n_colors=num_splits)
+
+   fig, axes = plt.subplots(1, len(metrics_to_plot), figsize=(8 * len(metrics_to_plot), 5), sharey=False)
+   axes = np.atleast_1d(axes)
+
+   def _format_param_count(count: Union[int, float, None]) -> str:
+      if count is None or not np.isfinite(count):
+         return "params N/A"
+      count = float(count)
+      if count >= 1e6:
+         return f"{count / 1e6:.2f}M params"
+      if count >= 1e3:
+         return f"{count / 1e3:.2f}K params"
+      return f"{int(count)} params"
+
+   def _format_training_time(seconds: Union[float, None]) -> str:
+      if seconds is None or not np.isfinite(seconds):
+         return "time N/A"
+      seconds = int(round(seconds))
+      hours, remainder = divmod(seconds, 3600)
+      minutes, secs = divmod(remainder, 60)
+      parts = []
+      if hours:
+         parts.append(f"{hours}h")
+      if minutes:
+         parts.append(f"{minutes}m")
+      if secs or not parts:
+         parts.append(f"{secs}s")
+      return " ".join(parts)
+
+   split_labels = {s: s.title() for s in splits}
+
+   for ax, metric in zip(axes, metrics_to_plot):
+      for idx, split in enumerate(splits):
+         key = f"{split}_{metric}"
+         offsets = x + (idx - (num_splits - 1) / 2) * width
+         values = []
+         for name in model_names:
+            value = model_metrics_dict[name].get(key)
+            values.append(value if value is not None else np.nan)
+         bars = ax.bar(offsets, values, width=width, color=palette[idx], label=f"{split_labels.get(split, split)} {metric.upper()}")
+
+         for bar_idx, bar in enumerate(bars):
+            value = values[bar_idx]
+            if value is None or not np.isfinite(value):
+               continue
+            model_name = model_names[bar_idx]
+            result_meta = model_results_dict.get(model_name, {})
+            annotation = (
+               f"{value:.3f}\n"
+               f"{_format_param_count(result_meta.get('num_params'))}\n"
+               f"{_format_training_time(result_meta.get('training_time'))}"
+            )
+            ax.text(
+               bar.get_x() + bar.get_width() / 2,
+               bar.get_height(),
+               annotation,
+               ha="center",
+               va="bottom",
+               fontsize=8,
+               rotation=0,
+            )
+
+      ax.set_title(f"{metric.upper()} at Best Epoch")
+      ax.set_ylabel(metric.upper())
+      ax.set_xticks(x)
+      ax.set_xticklabels(model_names, rotation=20, ha="right")
+      ax.grid(axis="y", linestyle=":", alpha=0.4)
+      ax.legend()
+
+   fig.suptitle("Model Comparisons - Loss and MAE per Split", fontsize=14)
+   plt.tight_layout(rect=[0, 0, 1, 0.94])
+   plt.show()

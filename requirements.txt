@@ -8,6 +8,7 @@ Ipython
 ipykernel
 matplotlib
 pyyaml
-pytest
 seaborn
 kagglehub[pandas-datasets]
+pydot
+graphviz

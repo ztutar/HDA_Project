@@ -117,7 +117,7 @@ def train_locator_and_save_rois(
       heatmap_threshold=extractor_cfg.heatmap_threshold
       rois = extract_rois_from_heatmap(
             heatmap=cam,
-            image=image,
+            image=image_viz,
             roi_size=roi_size,
             carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
             meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal

@@ -17,18 +17,14 @@ dependencies = [
     "tqdm",
     "keras",
     "ipython",
+    "ipykernel",
+    "jupyter",
     "matplotlib",
     "pyyaml",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-]
-
-[tool.pytest.ini_options]
-markers = [
-    "smoke: lightweight end-to-end checks"
+    "seaborn",
+    "kagglehub[pandas-datasets]",
+    "pydot",
+    "graphviz",
 ]
 
 [tool.setuptools]
