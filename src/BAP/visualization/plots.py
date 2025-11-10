@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
 import numpy as np
-from typing import Dict, Sequence, Union
+from typing import Any, Dict, Sequence, Union
+from IPython.display import display
 from BAP.utils.dataset_loader import load_image_original, load_image_grayscale, apply_clahe
 
 
@@ -80,7 +81,7 @@ def display_test_predictions(
 
    num_cols = min(4, sample_count)
    num_rows = int(np.ceil(sample_count / num_cols))
-   fig, axes = plt.subplots(num_rows, num_cols, figsize=(4 * num_cols, 4 * num_rows))
+   fig, axes = plt.subplots(num_rows, num_cols, figsize=(3 * num_cols, 4.25 * num_rows))
    axes = np.atleast_1d(axes).ravel()
 
    for ax, (_, row) in zip(axes, sample_df.iterrows()):
@@ -242,6 +243,106 @@ def plot_training_metrics(metrics_dict: Dict, model_name="Model"):
 
    plt.tight_layout()
    plt.show()
+
+
+def training_metrics_table(metrics: Dict[str, Any], model_name: str) -> None:
+   """
+   Display train/val/test loss, MAE, and RMSE metrics for a model in a compact table.
+
+   Args:
+      metrics (Dict[str, Any]): Metrics dict containing keys like ``train_loss`` or ``val_mae``.
+      model_name (str): Name of the model to use as the table caption.
+   """
+   if not isinstance(metrics, dict) or not metrics:
+      raise ValueError("metrics must be provided as a non-empty dictionary.")
+
+   splits = ("train", "val", "test")
+   metric_names = ("loss", "mae", "rmse")
+   has_required = any(f"{split}_{metric}" in metrics for split in splits for metric in metric_names)
+   if not has_required:
+      raise ValueError("metrics dictionary does not include the required split keys.")
+
+   rows = []
+   for split in splits:
+      row = {"Split": split.title()}
+      for metric in metric_names:
+         key = f"{split}_{metric}"
+         value = metrics.get(key)
+         if value is None:
+            row[metric.upper()] = None
+         elif isinstance(value, (int, float, np.floating)):
+            row[metric.upper()] = float(value)
+         else:
+            row[metric.upper()] = value
+      rows.append(row)
+
+   df = pd.DataFrame(rows).set_index("Split")
+   styled = df.style.set_caption(f"{model_name} Training Metrics").format(precision=4, na_rep="—")
+   display(styled)
+
+
+def compare_models_table(
+   model_results_dict: Dict[str, Dict[str, Any]],
+   model_metrics_dict: Dict[str, Dict[str, Any]],
+) -> None:
+   """
+   Display a consolidated table of metrics plus training stats for every model.
+
+   Args:
+      model_results_dict (Dict[str, Dict[str, Any]]): Per-model results (e.g., num_params).
+      model_metrics_dict (Dict[str, Dict[str, Any]]): Per-model metrics with split-prefixed keys.
+   """
+   model_names = sorted(set(model_results_dict.keys()) | set(model_metrics_dict.keys()))
+   if not model_names:
+      raise ValueError("No models found in the supplied dictionaries.")
+
+   metrics_fields = [
+      ("train_loss", "Train Loss"),
+      ("train_mae", "Train MAE"),
+      ("train_rmse", "Train RMSE"),
+      ("val_loss", "Val Loss"),
+      ("val_mae", "Val MAE"),
+      ("val_rmse", "Val RMSE"),
+      ("test_loss", "Test Loss"),
+      ("test_mae", "Test MAE"),
+      ("test_rmse", "Test RMSE"),
+   ]
+   result_fields = [
+      ("num_params", "Params"),
+      ("training_time", "Training Time (s)"),
+      ("num_epochs_ran", "Epochs Ran"),
+      ("best_epoch_idx", "Best Epoch Idx"),
+   ]
+
+   rows = []
+   for name in model_names:
+      metrics = model_metrics_dict.get(name, {})
+      results = model_results_dict.get(name, {})
+      row = {"Model": name}
+
+      for key, label in metrics_fields:
+         value = metrics.get(key)
+         if isinstance(value, (int, float, np.floating)):
+            row[label] = float(value)
+         else:
+            row[label] = value
+
+      for key, label in result_fields:
+         value = results.get(key)
+         if isinstance(value, (np.integer,)) or isinstance(value, int):
+            row[label] = int(value)
+         elif isinstance(value, (float, np.floating)):
+            row[label] = float(value)
+         else:
+            row[label] = value
+
+      rows.append(row)
+
+   df = pd.DataFrame(rows).set_index("Model")
+   float_cols = [label for _, label in metrics_fields] + ["Training Time (s)"]
+   format_dict = {col: "{:.4f}" for col in float_cols if col in df.columns}
+   styled = df.style.set_caption("Model Comparison Metrics & Training Stats").format(format_dict, na_rep="—")
+   display(styled)
 
 
 def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:

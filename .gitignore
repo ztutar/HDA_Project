@@ -191,3 +191,5 @@ __pycache__/
 
 # ignore experiments/checkpoints folder
 experiments/checkpoints/*
+
+model.png
