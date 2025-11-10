@@ -1,0 +1,14 @@
+{
+  "GlobalCNN": {
+    "num_params": 296097,
+    "training_time": 16103.461088895798,
+    "num_epochs_ran": 33,
+    "best_epoch_idx": 22
+  },
+  "GlobalCNN_Gender": {
+    "num_params": 296625,
+    "training_time": 15286.507498979568,
+    "num_epochs_ran": 32,
+    "best_epoch_idx": 21
+  }
+}
