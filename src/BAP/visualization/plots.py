@@ -163,7 +163,7 @@ def display_image_and_rois(
    axes[2].axis("off")
 
    axes[3].imshow(metaph_roi, cmap="gray")
-   axes[3].set_title("Metacarpal ROI")
+   axes[3].set_title("Metacarpus & Phalanx ROI")
    axes[3].axis("off")
 
    fig.suptitle("Random Image with Heatmap and Cropped ROIs", fontsize=14)

@@ -33,10 +33,6 @@ def build_ROI_CNN(
    
    input_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
    input_metp = layers.Input(shape=roi_shape, name="metaph") # [B,H,W,1]
-   inputs = {
-      "carpal": input_carp, 
-      "metaph": input_metp
-   } 
 
    feat_carp = ROI_CNN_head(input_carp, channels, dense_units, "carpal") # [B,dense_units]
    feat_metp = ROI_CNN_head(input_metp, channels, dense_units, "metaph") # [B,dense_units]
@@ -47,10 +43,11 @@ def build_ROI_CNN(
       gender_emb = layers.Embedding(input_dim=2, output_dim=8, name="gender_embed")(inp_gender) # [B,8]
       gender_emb = layers.Flatten(name="gender_embed_flat")(gender_emb) # [B,8]
       features = layers.Concatenate(name="ROI_heads_concat_with_gender")([features, gender_emb]) # [B,dense_units*2+8]
-      inputs["gender"] = inp_gender 
+      inputs = [input_carp, input_metp, inp_gender] 
       name = "ROI_CNN_with_gender"
       #logger.info("Building ROI-CNN model with gender input.")
    else:
+      inputs = [input_carp, input_metp]
       name = "ROI_CNN"
       #logger.info("Building ROI-CNN model w/o gender input.")
 

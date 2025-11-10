@@ -7,7 +7,7 @@ data:
 # ---------- ROI Locator/Extractor ----------
 roi:
   locator:
-    roi_path: "data/processed/cropped_rois"  # where ROI crops will be saved
+    roi_path: "data/cropped_rois"  # where ROI crops will be saved
     pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_01/GlobalCNN_best.keras" # model should be trained w/0 gender data
   extractor:
     roi_size: 128            # saved crop size (square)

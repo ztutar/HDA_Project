@@ -48,7 +48,7 @@ class TrainingConfig:
 
 @dataclass
 class ROILocatorConfig:
-   roi_path: str = "data/processed/cropped_rois"
+   roi_path: str = "data/cropped_rois"
    pretrained_model_path: str = ""
 
 @dataclass
