@@ -61,6 +61,8 @@ pip install -e .
 
 ## Notebooks & analysis
 
+<a href="https://colab.research.google.com/github/ztutar/HDA_Project/blob/main/BoneAgePrediction.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 - `BoneAgePrediction.ipynb` – Interactive pipeline walkthrough, rapid prototyping, and qualitative assessment.
 - `model_checkpoint/` – `.keras` exports and model_metrics/model_results dictionaries saved from the notebook.
 
