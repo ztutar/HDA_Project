@@ -22,5 +22,8 @@
     "training_time": 6156.491012334824,
     "num_epochs_ran": 41,
     "best_epoch_idx": 30
+  },
+  "roi_extraction": {
+    "roi_extraction_time": 1390.7393572330475
   }
 }
