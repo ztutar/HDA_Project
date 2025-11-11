@@ -10,5 +10,17 @@
     "training_time": 15508.165995121002,
     "num_epochs_ran": 32,
     "best_epoch_idx": 21
+  },
+  "ROI_CNN": {
+    "num_params": 608705,
+    "training_time": 6573.155463933945,
+    "num_epochs_ran": 44,
+    "best_epoch_idx": 33
+  },
+  "ROI_CNN_Gender": {
+    "num_params": 609745,
+    "training_time": 6156.491012334824,
+    "num_epochs_ran": 41,
+    "best_epoch_idx": 30
   }
 }

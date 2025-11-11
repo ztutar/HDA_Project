@@ -33,21 +33,17 @@ def build_FusionCNN(
    metaph_features = ROI_CNN_head(metaph_input, roi_channels, roi_dense_units, "metaph") # [B,roi_dense_units]
 
    fused = layers.Concatenate(name="fusion_concat")([global_features, carpal_features, metaph_features]) # [B, global_dense_units + roi_dense_units*2]
-   inputs = {
-      "image": image_input,
-      "carpal": carpal_input,
-      "metaph": metaph_input,
-   }
 
    if use_gender:
       gender_input = layers.Input(shape=(), dtype=tf.int32, name="gender") # [B,]
       gender_embedding = layers.Embedding(input_dim=2, output_dim=8, name="gender_embed")(gender_input) # [B,8]
       gender_embedding = layers.Flatten(name="gender_embed_flat")(gender_embedding) # [B,8]
       fused = layers.Concatenate(name="fusion_concat_with_gender")([fused, gender_embedding]) # [B, global_dense_units + roi_dense_units*2 + 8]
-      inputs["gender"] = gender_input 
+      inputs = [image_input, carpal_input, metaph_input, gender_input]
       name = "Fusion_CNN_with_gender"
       #logger.info("Building Fusion CNN model with gender input.")
    else:
+      inputs = [image_input, carpal_input, metaph_input]
       name = "Fusion_CNN"
       #logger.info("Building Fusion CNN model w/o gender input.")
 
