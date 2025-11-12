@@ -19,7 +19,7 @@ model:
   roi_channels: [32, 64, 128]
   roi_dense_units: 64
   dropout_rate: 0.2
-  use_gender: true
+  use_gender: false
 
 training:
   epochs: 70
