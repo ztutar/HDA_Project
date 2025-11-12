@@ -4,7 +4,7 @@ from typing import Tuple
 from dataclasses import asdict
 import os
 import gc
-#import io
+import io
 import glob
 import numpy as np
 import tensorflow as tf
@@ -13,7 +13,7 @@ import time
 import pandas as pd
 from pathlib import Path
 
-#from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
+from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_fusion_dataset
 
@@ -24,7 +24,7 @@ from BAP.models.Fusion_CNN import build_FusionCNN
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
 
-#logger = get_logger(__name__)
+logger = get_logger(__name__)
 
 def train_FusionCNN(
    paths: dict,
@@ -36,7 +36,7 @@ def train_FusionCNN(
    """
    Train the Fusion CNN model end to end on full-hand images plus ROI crops.
    """
-   #mirror_keras_stdout_to_file()
+   mirror_keras_stdout_to_file()
 
    # -----------------------
    # Config & reproducibility
@@ -52,7 +52,7 @@ def train_FusionCNN(
    policy_name = "mixed_float16"
    if keras.mixed_precision.global_policy().name != policy_name:
       keras.mixed_precision.set_global_policy(policy_name)
-      #logger.info("Set mixed-precision policy to %s", policy_name)
+      logger.info("Set mixed-precision policy to %s", policy_name)
 
    # -----------------------
    # ROI Locator & Extractor
@@ -76,7 +76,7 @@ def train_FusionCNN(
          "heatmaps": Path(heatmaps_dir)
          }
       if not (_has_pngs(carpal_dir) and _has_pngs(metaph_dir)):
-         #logger.info("Generating ROIs for %s split into %s.", split, roi_path)
+         logger.info("Generating ROIs for %s split into %s.", split, roi_path)
          roi_time_start = time.time()
          train_locator_and_save_rois(
             data_path=paths[split], 
@@ -86,7 +86,7 @@ def train_FusionCNN(
          )
          roi_time_end = time.time()
          roi_extraction_time += roi_time_end - roi_time_start
-   #logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
+   logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
 
    # -----------------------
    # Fusion Dataset
@@ -122,25 +122,24 @@ def train_FusionCNN(
       clahe=clahe,
       augment=False,
    )
-   #logger.info("Prepared fusion training and validation datasets from %s", data_cfg.data_path)
-
-   use_gender = model_cfg.use_gender
-   def _select_inputs(features: dict, label: tf.Tensor) -> Tuple[dict, tf.Tensor]:
-      inputs = {
-         "image": features["image"],
-         "carpal": features["carpal"],
-         "metaph": features["metaph"],
-      }
-      if use_gender:
-         inputs["gender"] = tf.cast(features["gender"], tf.int32)
-      return inputs, label
+   logger.info("Prepared fusion training and validation datasets from %s", data_cfg.data_path)
 
    batch_size = data_cfg.batch_size
-   train_ds = train_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   train_ds = train_ds.map(
+      lambda features, age: ({"image": features["image"],
+                              "carpal": features["carpal"], "metaph": features["metaph"],
+                              "gender": tf.cast(features["gender"], tf.int32)}, age),
+      num_parallel_calls=tf.data.AUTOTUNE,
+   )
    train_ds = train_ds.batch(batch_size)
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
    
-   val_ds = val_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+   val_ds = val_ds.map(
+      lambda features, age: ({"image": features["image"],
+                              "carpal": features["carpal"], "metaph": features["metaph"],
+                              "gender": tf.cast(features["gender"], tf.int32)}, age),
+      num_parallel_calls=tf.data.AUTOTUNE,
+   )
    val_ds = val_ds.batch(batch_size)
    val_ds = val_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
@@ -158,6 +157,8 @@ def train_FusionCNN(
    roi_dense_units = model_cfg.roi_dense_units
    fusion_dense_units = model_cfg.fusion_dense_units
    dropout_rate = model_cfg.dropout_rate
+   use_gender = model_cfg.use_gender
+
 
    model = build_FusionCNN(
       global_input_shape=global_input_shape,
@@ -195,7 +196,7 @@ def train_FusionCNN(
       loss=loss_fn, 
       metrics=metrics
    )
-   #logger.info("Model compiled with %s loss and Adam optimizer (LR=%.6f)", loss_name, learning_rate)
+   logger.info("Model compiled with Huber loss and Adam optimizer (LR=%.6f)", learning_rate)
 
    # -----------------------
    # Callbacks
@@ -215,13 +216,13 @@ def train_FusionCNN(
       verbose=1
    )
    callbacks.append(reduce_lr)
-   #logger.info("Configured training callbacks with patience: %d", patience)
+   logger.info("Configured training callbacks with patience: %d", patience)
 
    # -----------------------
    # Train
    # -----------------------
    epochs = training_cfg.epochs
-   #logger.info("Starting FusionCNN training for %d epochs", epochs)
+   logger.info("Starting FusionCNN training for %d epochs", epochs)
    start_train = time.time()
    history = model.fit(
       train_ds,
@@ -230,7 +231,7 @@ def train_FusionCNN(
       callbacks=callbacks,
       verbose=1,
    )
-   #logger.info("Training finished")
+   logger.info("Training finished")
    end_train = time.time()
 
    # -----------------------
@@ -240,17 +241,17 @@ def train_FusionCNN(
    training_time = end_train - start_train + roi_extraction_time
    num_epochs_ran = len(history.history.get("loss", []))
    total_time_display = f"{training_time:.2f}" if training_time is not None else "n/a"
-   #logger.info(
-   #   "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
-   #   model_name,
-   #   num_params,
-   #   num_epochs_ran,
-   #   total_time_display,
-   #)
+   logger.info(
+      "[%s] Params: %d | Number of epochs ran: %d | Total training time: %ss",
+      model_name,
+      num_params,
+      num_epochs_ran,
+      total_time_display,
+   )
 
-   #summary_stream = io.StringIO()
-   #model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
-   #logger.info("Model summary:\n%s", summary_stream.getvalue())
+   summary_stream = io.StringIO()
+   model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
+   logger.info("Model summary:\n%s", summary_stream.getvalue())
    
    # -----------------------
    # Test Evaluation (optional)
@@ -263,7 +264,7 @@ def train_FusionCNN(
       test_image_dir = Path(paths["test"])
       test_roi_dir = roi_paths["test"]
       test_metadata = pd.read_csv("data/metadata/test.csv")
-      #logger.info("Evaluating %s on the test split.", model_name)
+      logger.info("Evaluating %s on the test split.", model_name)
       test_ds = make_fusion_dataset(
          image_dir=test_image_dir,
          roi_dir=test_roi_dir,
@@ -272,24 +273,29 @@ def train_FusionCNN(
          clahe=clahe,
          augment=False,
    )
-      test_ds = test_ds.map(_select_inputs, num_parallel_calls=tf.data.AUTOTUNE)
+      test_ds = test_ds.map(
+         lambda features, age: ({"image": features["image"],
+                                 "carpal": features["carpal"], "metaph": features["metaph"],
+                                 "gender": tf.cast(features["gender"], tf.int32)}, age),
+         num_parallel_calls=tf.data.AUTOTUNE,
+      )
       test_ds = test_ds.batch(batch_size)
       test_ds = test_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
       test_metrics = model.evaluate(test_ds, return_dict=True, verbose=1)
       test_loss = float(test_metrics.get("loss", float("nan")))
       test_mae = float(test_metrics.get("mae", float("nan")))
       test_rmse = float(test_metrics.get("rmse", float("nan")))
-      #logger.info(
-      #   "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
-      #   test_loss,
-      #   test_mae,
-      #   test_rmse,
-      #)
+      logger.info(
+         "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
+         test_loss,
+         test_mae,
+         test_rmse,
+      )
    else:
-      #logger.info(
-      #   "Skipping test evaluation because training.perform_test is %s.",
-      #   perform_test,
-      #)
+      logger.info(
+         "Skipping test evaluation because training.perform_test is %s.",
+         perform_test,
+      )
       test_ds = None
 
    # -----------------------
@@ -304,13 +310,13 @@ def train_FusionCNN(
    val_mae = history.history.get("val_mae", float("nan"))[best_epoch_idx]
    val_rmse = history.history.get("val_rmse", float("nan"))[best_epoch_idx]
 
-   #logger.info(
-   #   "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
-   #   train_mae,
-   #   train_rmse,
-   #   val_mae,
-   #   val_rmse,
-   #)
+   logger.info(
+      "Best epoch metrics — train MAE: %.4f, train RMSE: %.4f, val MAE: %.4f, val RMSE: %.4f",
+      train_mae,
+      train_rmse,
+      val_mae,
+      val_rmse,
+   )
 
    summary_base = {
       "model_name": model_name,
@@ -331,7 +337,7 @@ def train_FusionCNN(
       base_data=summary_base,
       config_bundle=config_bundle,
    )
-   #logger.info("Appended training summary to %s", results_csv)
+   logger.info("Appended training summary to %s", results_csv)
 
    # -----------------------
    # Cleanup
@@ -339,6 +345,6 @@ def train_FusionCNN(
    train_ds = val_ds = test_ds = None
    keras.backend.clear_session()
    gc.collect()
-   #logger.info("Cleaned up session after training")
+   logger.info("Cleaned up session after training")
 
    return model, history

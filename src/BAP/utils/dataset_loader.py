@@ -62,7 +62,8 @@ def make_dataset(
          image = _augment_image(image)
          
       image_viz = tf.clip_by_value(image, 0.0, 1.0)
-      image = _zscore_norm(image)
+      #image = _zscore_norm(image)
+      image = tf.clip_by_value(image, 0.0, 1.0)
       features = {
          "image_id": image_id, 
          "image": image, 
@@ -96,8 +97,11 @@ def make_roi_dataset(
    def _load_roi(image_id: tf.Tensor, age: tf.Tensor, gender: tf.Tensor):
       carpal_path = tf.strings.join([carpal_base, "/", image_id, ".png"])
       metaph_path = tf.strings.join([metaph_base, "/", image_id, ".png"])
-      carpal = _zscore_norm(load_image_grayscale(carpal_path))
-      metaph = _zscore_norm(load_image_grayscale(metaph_path))
+      #carpal = _zscore_norm(load_image_grayscale(carpal_path))
+      #metaph = _zscore_norm(load_image_grayscale(metaph_path))
+      carpal = tf.clip_by_value(load_image_grayscale(carpal_path), 0.0, 1.0)
+      metaph = tf.clip_by_value(load_image_grayscale(metaph_path), 0.0, 1.0)
+      
       features = {
          "image_id": image_id,
          "carpal": carpal,
@@ -148,10 +152,11 @@ def make_fusion_dataset(
          image = apply_clahe(image)
       if augment:
          image = _augment_image(image)
-      image = _zscore_norm(image)
-
-      carpal = load_image_grayscale(carpal_path)
-      metaph = load_image_grayscale(metaph_path)
+      #image = _zscore_norm(image)
+      image = tf.clip_by_value(image, 0.0, 1.0)
+      
+      carpal = tf.clip_by_value(load_image_grayscale(carpal_path), 0.0, 1.0)
+      metaph = tf.clip_by_value(load_image_grayscale(metaph_path), 0.0, 1.0)
 
       features = {
          "image_id": image_id,

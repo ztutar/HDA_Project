@@ -6,12 +6,11 @@ from BAP.training.train_GlobalCNN import train_GlobalCNN
 from BAP.training.train_ROI_CNN import train_ROI_CNN
 from BAP.training.train_Fusion_CNN import train_FusionCNN
 
-#from BAP.utils.logger import setup_logging
+from BAP.utils.logger import setup_logging
 from BAP.utils.config import load_config
 from BAP.utils.seeds import set_seeds
 from BAP.utils.path_manager import incremental_path
 from BAP.utils.dataset_loader import get_rsna_dataset
-
 
 # Map user-friendly aliases to canonical model metadata (name, trainer, default config)
 MODEL_REGISTRY = {
@@ -32,7 +31,6 @@ def main(model_name: str, config_path: Optional[str]) -> None:
    # Check if the model is supported
    normalized_name = model_name.strip().lower()
    if normalized_name not in MODEL_REGISTRY:
-      #logger.error("Model '%s' is not supported.", model_name)
       raise ValueError(f"Unsupported model: {model_name}")
    
    # Retrieve model name and training function
@@ -50,7 +48,7 @@ def main(model_name: str, config_path: Optional[str]) -> None:
    )
    
    # Setup logging
-   #logger = setup_logging(log_dir=save_dir)
+   logger = setup_logging(log_dir=save_dir)
    
    # Load the configuration file or use default
    config_bundle = load_config(config_path)
@@ -59,7 +57,7 @@ def main(model_name: str, config_path: Optional[str]) -> None:
    set_seeds()
    
    # Start training
-   #logger.info("Starting training for model: %s, using config: %s", canonical_name, config_filename)
+   logger.info("Starting training for model: %s, using config: %s", canonical_name, config_filename)
    train_fn(paths, config_bundle, save_dir)
 
 
