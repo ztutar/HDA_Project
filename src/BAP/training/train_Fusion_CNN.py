@@ -16,6 +16,8 @@ from pathlib import Path
 from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_fusion_dataset
+from BAP.utils.path_manager import save_model_dicts
+
 
 from BAP.roi.ROI_locator import train_locator_and_save_rois
 
@@ -252,7 +254,28 @@ def train_FusionCNN(
    summary_stream = io.StringIO()
    model.summary(print_fn=lambda line: summary_stream.write(line + "\n"))
    logger.info("Model summary:\n%s", summary_stream.getvalue())
-   
+
+   # -----------------------
+   # Save model results & metrics
+   # -----------------------
+   model_results_dict = {
+      "num_params": num_params,
+      "training_time": training_time,
+      "num_epochs_ran": num_epochs_ran,
+      "best_epoch_idx": best_epoch_idx
+   }
+   model_metrics_dict = {
+      "history": history.history,
+      "train_loss": history.history["loss"][best_epoch_idx],
+      "train_mae": history.history["mae"][best_epoch_idx],
+      "train_rmse": history.history["rmse"][best_epoch_idx],
+      "val_loss": history.history["val_loss"][best_epoch_idx],
+      "val_mae": history.history["val_mae"][best_epoch_idx],
+      "val_rmse": history.history["val_rmse"][best_epoch_idx],
+   }
+   save_model_dicts(model_results_dict, os.path.join(save_dir, "model_results.json"))
+   save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json"))
+
    # -----------------------
    # Test Evaluation (optional)
    # -----------------------
@@ -291,6 +314,12 @@ def train_FusionCNN(
          test_mae,
          test_rmse,
       )
+      model_metrics_dict.update({
+         "test_loss": test_metrics["loss"],
+         "test_mae": test_metrics["mae"],
+         "test_rmse": test_metrics["rmse"]
+      })
+      save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json")) 
    else:
       logger.info(
          "Skipping test evaluation because training.perform_test is %s.",

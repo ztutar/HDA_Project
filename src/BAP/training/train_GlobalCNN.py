@@ -5,6 +5,7 @@ from typing import Tuple
 from dataclasses import asdict
 import gc
 import io
+import os
 import numpy as np
 import tensorflow as tf
 import keras
@@ -15,6 +16,7 @@ import pandas as pd
 from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_dataset
+from BAP.utils.path_manager import save_model_dicts
 
 from BAP.models.Global_CNN import build_GlobalCNN
 
@@ -80,8 +82,7 @@ def train_GlobalCNN(
    batch_size = data_cfg.batch_size
 
    train_ds = train_ds.map(
-      lambda features, age: ({"image": features["image"], "image_viz": features["image_viz"],
-                              "image_id": features["image_id"],
+      lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
                               "gender": tf.cast(features["gender"], tf.int32)}, age),
       num_parallel_calls=tf.data.AUTOTUNE,
    )
@@ -89,8 +90,7 @@ def train_GlobalCNN(
    train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
    val_ds = val_ds.map(
-      lambda features, age: ({"image": features["image"], "image_viz": features["image_viz"],
-                              "image_id": features["image_id"],
+      lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
                               "gender": tf.cast(features["gender"], tf.int32)}, age),
       num_parallel_calls=tf.data.AUTOTUNE,
    )
@@ -196,6 +196,27 @@ def train_GlobalCNN(
    logger.info("Model summary:\n%s", summary_stream.getvalue())
    
    # -----------------------
+   # Save model results & metrics
+   # -----------------------
+   model_results_dict = {
+      "num_params": num_params,
+      "training_time": training_time,
+      "num_epochs_ran": num_epochs_ran,
+      "best_epoch_idx": best_epoch_idx
+   }
+   model_metrics_dict = {
+      "history": history.history,
+      "train_loss": history.history["loss"][best_epoch_idx],
+      "train_mae": history.history["mae"][best_epoch_idx],
+      "train_rmse": history.history["rmse"][best_epoch_idx],
+      "val_loss": history.history["val_loss"][best_epoch_idx],
+      "val_mae": history.history["val_mae"][best_epoch_idx],
+      "val_rmse": history.history["val_rmse"][best_epoch_idx],
+   }
+   save_model_dicts(model_results_dict, os.path.join(save_dir, "model_results.json"))
+   save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json"))
+   
+   # -----------------------
    # Test Evaluation (optional)
    # -----------------------
    perform_test = training_cfg.perform_test
@@ -213,8 +234,7 @@ def train_GlobalCNN(
          augment=False,
       )
       test_ds = test_ds.map(
-         lambda features, age: ({"image": features["image"], "image_viz": features["image_viz"],
-                                 "image_id": features["image_id"],
+         lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
                                  "gender": tf.cast(features["gender"], tf.int32)}, age),
          num_parallel_calls=tf.data.AUTOTUNE,
       )
@@ -228,6 +248,12 @@ def train_GlobalCNN(
          test_mae,
          test_rmse,
       )
+      model_metrics_dict.update({
+         "test_loss": test_metrics["loss"],
+         "test_mae": test_metrics["mae"],
+         "test_rmse": test_metrics["rmse"]
+      })
+      save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json"))      
    else:
       logger.info(
          "Skipping test evaluation because training.perform_test is %s.",
@@ -275,6 +301,7 @@ def train_GlobalCNN(
       config_bundle=config_bundle,
    )
    logger.info("Appended training summary to %s", results_csv)
+
 
    # -----------------------
    # Cleanup

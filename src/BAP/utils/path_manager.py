@@ -1,5 +1,8 @@
 
 import os
+import json
+from typing import Any, Dict
+
 
 def incremental_path(save_dir: str, model_name: str = None, config_name: str = None) -> str:
    """
@@ -27,3 +30,21 @@ def incremental_path(save_dir: str, model_name: str = None, config_name: str = N
 
    # If the loop exceeds the limit, raise an error (unlikely in practice).
    raise RuntimeError(f"Too many folders created for {config_name}")
+
+
+# Utility helpers for persisting model metadata between sessions
+def load_model_dicts(results_path: str) -> Dict[str, Dict[str, Any]]:
+   """Load saved model metadata if it exists, otherwise return an empty dict."""
+   if not os.path.exists(results_path):
+      return {}
+   with open(results_path, "r", encoding="utf-8") as fp:
+      return json.load(fp)
+
+
+def save_model_dicts(results: Dict[str, Dict[str, Any]], results_path: str) -> None:
+   """Persist the current metadata to disk so it can be reloaded later."""
+   tmp_path = f"{results_path}.tmp"
+   os.makedirs(os.path.dirname(results_path), exist_ok=True)
+   with open(tmp_path, "w", encoding="utf-8") as fp:
+      json.dump(results, fp, indent=2)
+   os.replace(tmp_path, results_path)
