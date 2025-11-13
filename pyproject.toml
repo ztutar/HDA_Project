@@ -12,6 +12,7 @@ authors = [{ name = "Zeynep Tutar" }]
 dependencies = [
     "pandas",
     "numpy",
+    "tensorflow",
     "opencv-python",
     "tqdm",
     "keras",
@@ -25,9 +26,6 @@ dependencies = [
     "pydot",
     "graphviz",
 ]
-[project.optional-dependencies]
-cpu = ["tensorflow"]
-cuda = ["tensorflow[and-cuda]"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
