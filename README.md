@@ -50,8 +50,15 @@ cd HDA_Project
 python -m venv .venv
 source .venv/bin/activate           
 pip install --upgrade pip
-pip install -e .                    
+pip install -e .                    # installs base deps (TensorFlow intentionally omitted)
+# If TensorFlow is missing on your host, pick one extra:
+#   CPU-only wheel (w/out CUDA)
+pip install -e .[cpu]
+#   CUDA-enabled wheel
+pip install -e .[cuda]
 ```
+
+If the environment already ships with TensorFlow (e.g., Google Colab’s GPU runtimes), you can skip the extra install or run `pip install -e . --no-deps` to avoid replacing the preloaded build.
 
 ### Dataset & metadata
 
