@@ -1,7 +1,25 @@
-#TODO: add docstring explanation for this module. Write in details and explain each function and class.
+"""
+Fusion CNN training pipeline utilities.
+
+This module orchestrates the full end-to-end workflow required to train the
+fusion model that combines global full-hand radiographs with region-of-interest
+carpal/metaph crops and tabular metadata. It provides:
+
+- Automated ROI generation by invoking the locator network when cached crops
+   are missing, ensuring that every split has synchronized image/crop pairs.
+- Creation of the multi-input ``tf.data`` pipelines with preprocessing,
+   augmentation, batching, and prefetching optimized for GPU throughput.
+- Model construction via ``build_FusionCNN`` followed by optimizer/loss/metric
+   configuration using mixed precision for faster execution on modern hardware.
+- Training loop setup with callbacks, learning-rate scheduling, optional test
+   evaluation, and detailed metric logging for experiment tracking.
+- Persistence of model statistics, history, and ROI metadata so downstream
+   reporting code can reproduce the experiment without rerunning training.
+- Cleanup helpers that free TensorFlow resources to avoid GPU/CPU memory leaks
+   when multiple training runs are executed sequentially.
+"""
 
 from typing import Tuple
-from dataclasses import asdict
 import os
 import gc
 import io
@@ -33,10 +51,49 @@ def train_FusionCNN(
    config_bundle: ProjectConfig,
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   
-   #TODO: add docstring explanation for this function. write in details and explain each step
    """
-   Train the Fusion CNN model end to end on full-hand images plus ROI crops.
+   Train the Fusion CNN model that fuses global images, ROI crops, and metadata.
+
+   Step-by-step overview:
+
+   1. Configure mixed-precision and read the relevant sub-configs for data,
+      model, ROI locator, and training hyper-parameters.
+   2. Ensure ROI crops exist for every split by invoking
+      ``train_locator_and_save_rois`` when cached PNG crops are missing, and
+      track the wall-clock time spent generating them.
+   3. Build ``tf.data`` pipelines via ``make_fusion_dataset`` for the train,
+      validation, and (optionally) test splits, applying CLAHE preprocessing,
+      augmentation, batching, and prefetching. The datasets emit dictionaries
+      that match the Fusion CNN input signature.
+   4. Deduce the tensor shapes from a sample batch and construct the Fusion CNN
+      using the architecture parameters from ``config_bundle.model``.
+   5. Compile the model with a mixed-precision-scaled Adam optimizer, Huber
+      regression loss, and MAE/RMSE metrics to stabilize training on noisy age
+      labels.
+   6. Register callbacks (checkpointing, early stopping, LR reduction) and run
+      ``model.fit`` while logging timing information for reproducibility.
+   7. Optionally evaluate on the test split, append the summarized metrics to
+      the experiment CSV via ``append_summary_row``, and persist detailed
+      histories/metadata through ``save_model_dicts``.
+   8. Release dataset handles and TensorFlow sessions to prevent memory
+      accumulation in repeated runs.
+
+   Parameters
+   ----------
+   paths:
+      Mapping with keys such as ``"train"``, ``"val"``, and ``"test"`` pointing
+      to directories containing the corresponding full-hand radiographs.
+   config_bundle:
+      ``ProjectConfig`` instance that bundles every sub-configuration (data,
+      ROI, model, training) needed by the pipeline.
+   save_dir:
+      Directory where checkpoints, logs, and JSON summaries should be written.
+
+   Returns
+   -------
+   Tuple[keras.Model, keras.callbacks.History]
+      The trained Fusion CNN instance and the ``History`` object returned by
+      ``model.fit`` so callers can perform additional evaluation or persistence.
    """
    mirror_keras_stdout_to_file()
 

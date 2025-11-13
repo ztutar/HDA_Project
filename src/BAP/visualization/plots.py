@@ -1,3 +1,20 @@
+"""Visualization utilities for the Bone Age Prediction (BAP) project.
+
+This module centralizes all figures, tables, and quick-look plots that support
+dataset exploration, model debugging, and training diagnostics. Functions here
+focus on:
+
+* Sampling images to visually sanity-check metadata integrity.
+* Inspecting preprocessing steps (e.g., CLAHE) versus raw radiographs.
+* Displaying prediction quality on random samples to surface obvious failures.
+* Summarizing training runs via curves and styled tables for notebooks.
+* Comparing multiple experiments to quickly identify the best configuration.
+
+Every helper is intended for interactive use inside notebooks or ad-hoc
+analysis scripts; therefore, they directly render matplotlib figures or styled
+dataframes instead of returning low-level objects.
+"""
+
 import pandas as pd
 from pathlib import Path
 import os
@@ -10,8 +27,19 @@ from IPython.display import display
 from BAP.utils.dataset_loader import load_image_original, load_image_grayscale, apply_clahe
 
 
-# Function to visualize sample images from the dataset
 def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: int=4) -> None:
+   """
+   Draw ``n_samples`` random radiographs and annotate them with metadata fields.
+
+   Args:
+      metadata (pd.DataFrame): Table containing at least ``Image ID``, ``Bone Age (months)``,
+         and ``male`` columns.
+      image_dir (Path): Directory with PNG files named as ``<Image ID>.png``.
+      n_samples (int): Number of images to visualize (defaults to 4).
+
+   Raises:
+      FileNotFoundError: If any sampled image is missing on disk.
+   """
    sample_metadata = metadata.sample(n_samples)
    plt.figure(figsize=(15, 5))
    for i, (idx, row) in enumerate(sample_metadata.iterrows()):
@@ -26,8 +54,13 @@ def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: in
    plt.show()
    
    
-# Function to plot distribution of bone age and gender
 def plot_distributions(metadata: pd.DataFrame) -> None:
+   """
+   Plot aggregated dataset distributions for bone age (histogram) and gender.
+
+   Args:
+      metadata (pd.DataFrame): Metadata table containing ``Bone Age (months)`` and ``male``.
+   """
    plt.figure(figsize=(10, 4))
 
    # Distribution of Bone Age
@@ -60,11 +93,14 @@ def display_test_predictions(
    Display random examples from the test set alongside their predicted ages.
 
    Args:
-      metadata (pd.DataFrame): Test split metadata with `Image ID` and `Bone Age (months)`.
-      predictions (Sequence[float] | np.ndarray): Model predictions aligned with `metadata`.
-      image_dir (Path): Directory that contains the corresponding `.png` files.
+      metadata (pd.DataFrame): Test split metadata with ``Image ID`` and ``Bone Age (months)``.
+      predictions (Sequence[float] | np.ndarray): Model predictions aligned with ``metadata``.
+      image_dir (Path): Directory that contains the corresponding ``.png`` files.
       n_samples (int): Number of random samples to display.
       seed (int | None): Optional random seed for reproducibility.
+
+   Raises:
+      ValueError: If the predictions length mismatches the metadata length.
    """
 
    predictions_arr = np.asarray(predictions).reshape(-1)
@@ -116,10 +152,13 @@ def display_image_and_rois(
    Display a random sample with its Grad-CAM heatmap and cropped ROIs.
 
    Args:
-      metadata (pd.DataFrame): Split metadata containing `Image ID`.
-      image_dir (Path): Directory containing the original `.png` images.
-      roi_dirs (Dict[str, Path]): Mapping with `carpal`, `metaph`, and `heatmaps` directories.
-      seed (int | None): Optional seed for reproducible sampling.
+      metadata (pd.DataFrame): Split metadata containing ``Image ID``.
+      image_dir (Path): Directory containing the original ``.png`` images.
+      roi_dirs (Dict[str, Path]): Mapping with ``carpal``, ``metaph``, and ``heatmaps`` directories.
+
+   Raises:
+      ValueError: If required metadata columns or ROI directories are missing.
+      FileNotFoundError: When any of the sampled files does not exist.
    """
 
    required_columns = {"Image ID"}
@@ -178,9 +217,11 @@ def display_raw_vs_clahe_images(metadata: pd.DataFrame, image_dir: Path) -> None
    Visualize a single random image and the effect of CLAHE preprocessing.
 
    Args:
-      metadata (pd.DataFrame): Split metadata including `Image ID`.
-      image_dir (Path): Directory containing the original `.png` files.
-      seed (int | None): Optional seed to make the sampled image reproducible.
+      metadata (pd.DataFrame): Split metadata including ``Image ID``.
+      image_dir (Path): Directory containing the original ``.png`` files.
+
+   Raises:
+      FileNotFoundError: If the randomly selected image is missing.
    """
 
    sample_row = metadata.sample(1).iloc[0]
@@ -216,6 +257,17 @@ def display_raw_vs_clahe_images(metadata: pd.DataFrame, image_dir: Path) -> None
 
 
 def plot_training_metrics(metrics_dict: Dict, model_name="Model"):
+   """
+   Plot MAE and loss learning curves (and epoch time if available) for a single model.
+
+   Args:
+      metrics_dict (Dict): Dictionary containing a Keras-style ``history`` plus optional
+         ``times_per_epoch`` list.
+      model_name (str): Label used in subplot titles.
+
+   Raises:
+      KeyError: If the required keys are not present in ``metrics_dict``.
+   """
    history = metrics_dict['history']
    times_per_epoch = metrics_dict.get('times_per_epoch')
 

@@ -1,5 +1,12 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
+"""ROI extraction helpers for hand bone age pipelines.
 
+The routines in this module take a single-channel heatmap produced by a
+localization network and the corresponding image and derive two square 
+regions of interest (ROIs): a carpal ROI that is centered on the most prominent 
+activation peak in the lower half of the heatmap, and a metacarpal ROI that is 
+searched for after masking out a rectangular area beneath the first peak. The 
+utilities handle peak selection, bounding-box construction, and masking.
+"""
 
 from typing import Tuple, Dict, List
 import tensorflow as tf
@@ -13,25 +20,36 @@ def extract_rois_from_heatmap(
    meta_mask_radius: float,
    heatmap_threshold: float,
    ) -> Dict[str, tf.Tensor]:
-   """
-   Given a Grad-CAM heatmap on the full image, extract two square ROI crops:
-   1) Carpal (first/primary peak)
-   2) Metacarpal/phalange (second peak after masking the first region)
+   """Crop carpal and metacarpal ROIs based on heatmap peak locations.
+
+   The procedure first converts the supplied heatmap and image to float tensors,
+   then locates the highest peak to estimate the general carpal area. The second
+   ROI is discovered by masking a rectangular region extending downward from
+   that first peak and finding the next strongest activation, which tends to
+   correspond to the metacarpal/phalange area.  Both ROIs are cropped with a
+   square whose side length is proportional to the image size and resized to a
+   fixed `roi_size` for downstream models.
 
    Args:
-      heatmap (tf.Tensor): [H,W] Grad-CAM in [0,1].
-      img (tf.Tensor): [H,W,1] full image tensor (float32).
-      roi_size (int): Output crop size (square).
-      carpal_margin (float): Context margin for ROI-1 box (fraction of min(H,W)).
-      meta_mask_radius (float): Width fraction for the bottom-anchored mask used when finding ROI-2.
-      heatmap_threshold (float): Reject peaks when cam value < threshold.
+      heatmap: 2D tensor ``[H, W]`` containing localization scores.
+      image: Tensor ``[H, W, C]`` holding the source image that aligns with the
+         heatmap.
+      roi_size: Target side length (in pixels) of the resized ROI crops.
+      carpal_margin: Fraction of the minimum spatial dimension used to derive
+         the square crop radius around the detected carpal center.
+      meta_mask_radius: Fractional width of the rectangular mask applied before
+         searching for the metacarpal peak.  Higher values hide a wider band.
+      heatmap_threshold: Minimum acceptable activation for selecting a peak;
+         if the activation falls below this value, the function falls back to
+         the spatial center of the image to avoid empty crops.
 
    Returns:
-      Dict[str,Dict]: {
-         "carpal": {"crop": tf.Tensor[roi_size,roi_size,1], "box": (y0,x0,y1,x1)},
-         "metaph": {"crop": tf.Tensor[roi_size,roi_size,1], "box": (y0,x0,y1,x1)}
-      }
+      A dictionary with two float32 tensors of shape ``[roi_size, roi_size, C]``:
+      ``"carpal"`` for the wrist region and ``"metaph"`` for the
+      metacarpal/phalange region.
    """
+
+
    heatmap = tf.convert_to_tensor(heatmap, dtype=tf.float32)
    image = tf.convert_to_tensor(image, dtype=tf.float32)
 
@@ -87,15 +105,20 @@ def extract_rois_from_heatmap(
 # -----------------------------
 
 def _peak_loc_heatmap(heatmap: tf.Tensor) -> Tuple[int, int]:
-   """
-   Find (y,x) location of maximum in a CAM heatmap.
+   """Return the coordinates of the global maximum in the heatmap.
+
+   The tensor is flattened to find the argmax index, which is then converted
+   back to ``(row, column)`` coordinates.  The function assumes static spatial
+   dimensions so it can operate inside TensorFlow graphs without shape tracing.
 
    Args:
-      heatmap (tf.Tensor): [H,W] float32 heatmap in [0,1].
+      heatmap: 2D tensor containing scalar activation values.
 
    Returns:
-      Tuple[int,int]: (y,x) indices of the peak.
+      Tuple ``(y, x)`` with integer indices of the maximum activation.
    """
+
+
    idx = tf.argmax(tf.reshape(heatmap, [-1]))
    h, w = heatmap.shape
    y = idx // w
@@ -103,16 +126,21 @@ def _peak_loc_heatmap(heatmap: tf.Tensor) -> Tuple[int, int]:
    return int(y), int(x)
 
 def _top_k_peak_locs(heatmap: tf.Tensor, k: int) -> List[Tuple[int, int]]:
-   """
-   Return the (y,x) locations of the top-k peaks in the heatmap.
+   """Return the ``k`` highest-scoring peak coordinates from the heatmap.
+
+   It validates that the heatmap shape is statically known, flattens it, and
+   uses ``tf.math.top_k`` to obtain the indices for the strongest activations.
+   Each flat index is translated back to ``(row, column)`` coordinates and
+   collected in descending order of activation.
 
    Args:
-      heatmap (tf.Tensor): [H,W] float32 heatmap.
-      k (int): Number of peaks requested.
+      heatmap: 2D tensor with localization activations.
+      k: Desired number of peaks; automatically clamped to ``[1, H*W]``.
 
    Returns:
-      List[Tuple[int,int]]: Peak locations sorted by descending activation.
+      List of length ``k`` containing ``(y, x)`` tuples ordered by peak score.
    """
+
    h, w = heatmap.shape
    if h is None or w is None:
       raise ValueError("Heatmap spatial dimensions must be statically known.")
@@ -138,17 +166,26 @@ def _square_box_around(
    H: int, 
    W: int,
 ) -> Tuple[int, int, int, int]:
-   """
-   Build a square crop around (center_y, center_x) using a margin fraction of image size.
+   """Compute a clipped square bounding box around a center point.
+
+   The side length is derived from ``margin_frac * min(H, W)`` so the box scales
+   with the image resolution.  Bounds are clipped to the image size and enforced
+   to be at least three pixels wide/high to avoid degenerate crops that break
+   subsequent resize operations.
 
    Args:
-      center_y, center_x (int): Peak coordinates.
-      margin_frac (float): Extra context as a fraction of min(H,W).
-      H, W (int): Heatmap/image dimensions.
+      center_y: Vertical coordinate of the box center.
+      center_x: Horizontal coordinate of the box center.
+      margin_frac: Fraction of the smaller image dimension used to expand the
+         square in all directions.
+      H: Image height.
+      W: Image width.
 
    Returns:
-      (y0, x0, y1, x1): Integer coordinates, clipped to image bounds.
+      Tuple ``(y0, x0, y1, x1)`` describing the inclusive-exclusive crop bounds.
    """
+
+
    r = int(min(H,W) * margin_frac / 2.0)
    y0 = max(0, center_y - r)
    x0 = max(0, center_x - r)
@@ -168,17 +205,26 @@ def _mask_rect_to_bottom(
    cx: int,
    radius_frac: float,
 ) -> tf.Tensor:
-   """
-   Mask a bottom-anchored rectangle around (cy,cx) to suppress the carpal ROI when searching the second.
+   """Zero out a vertical rectangular band beneath a reference peak.
+
+   The rectangle spans horizontally ``2 * radius_frac * min(H, W)`` pixels and
+   extends from ``cy - width/2`` down to the bottom of the heatmap.  This helps
+   suppress the already-discovered carpal region so that subsequent peaks are
+   forced to appear elsewhere when searching for the metacarpal ROI.
 
    Args:
-      heatmap (tf.Tensor): [H,W] CAM heatmap.
-      cy, cx (int): Center to mask.
-      radius_frac (float): Rectangle width as a fraction of min(H,W).
+      heatmap: Source heatmap tensor that will be masked.
+      cy: Row index of the reference peak.
+      cx: Column index of the reference peak.
+      radius_frac: Relative half-width controlling how wide the masked band is;
+         non-positive values leave the heatmap unchanged.
 
    Returns:
-      tf.Tensor: New heatmap with the rectangle zeroed out.
+      A tensor with the same shape as ``heatmap`` where the masked region is set
+      to zero (or the tensor's zero-equivalent value).
    """
+
+
    if radius_frac <= 0:
       return heatmap
    H, W = heatmap.shape

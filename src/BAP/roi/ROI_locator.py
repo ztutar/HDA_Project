@@ -1,4 +1,12 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
+"""Utilities for running the ROI locator network and persisting its predictions.
+
+The locator takes preprocessed hand radiographs, generates Grad-CAM heatmaps to
+highlight salient regions, then extracts carpal and metacarpal crops that will
+feed downstream pipelines. This module hides the mechanics of loading a
+pretrained locator checkpoint, iterating over TF datasets, computing Grad-CAM,
+extracting crops, and saving the resulting PNG files (optionally with heatmap
+overlays).
+"""
 
 
 from typing import Dict
@@ -28,19 +36,27 @@ def train_locator_and_save_rois(
    config: ProjectConfig,
    split: str,
 ) -> None:
-   """
-   Load a pretrained GlobalCNN, compute Grad-CAM per image to extract
-   two ROI crops, and save them.
+   """Run the pretrained ROI locator on a dataset split and save crops as PNGs.
+
+   The function builds a TF dataset for the requested `split`, loads the locator
+   checkpoint indicated in the configuration, and performs a single inference
+   pass. For every image it computes Grad-CAM, extracts carpal and metacarpal
+   ROIs from the heatmap, and writes them to the directories provided in
+   `roi_paths`. When heatmap saving is enabled, the colorized overlay is also
+   written to disk, mirroring the image IDs from the metadata CSV.
 
    Args:
-      config (Dict): Loaded config (roi_only.yaml).
-      split (str): 'train' | 'validation' | 'test'.
-      out_root (str): Base folder to save crops (e.g., data/processed/cropped_rois).
+      data_path: Directory containing the raw images for the given split.
+      roi_paths: Mapping with `"carpal"`, `"metaph"`, and optionally `"heatmaps"`
+         destinations where PNGs will be saved.
+      config: Full project configuration providing dataset, locator, and
+         extractor settings.
+      split: Dataset split name (e.g., `"train"`, `"val"`, `"test"`) used to
+         select the CSV metadata file and augmentations.
 
-   Produces:
-      {out_root}/{split}/carpal/{image_id}.png
-      {out_root}/{split}/metaph/{image_id}.png
-      {out_root}/{split}/roi_coords.csv    # (image_id, y0,x0,y1,x1 for both ROIs)
+   Raises:
+      ValueError: If the pretrained model path is missing in the configuration.
+      FileNotFoundError: When the specified checkpoint cannot be located on disk.
    """
    
    #mirror_keras_stdout_to_file()
@@ -138,14 +154,7 @@ def train_locator_and_save_rois(
 
 
 def _save_png(path: str, img: tf.Tensor) -> None:
-   """
-   Save an image tensor or array to PNG. Float inputs are clipped to [0,1]
-   before conversion to uint8.
-
-   Args:
-      path (str): Destination file path.
-      img (tf.Tensor): Image tensor or array (float or uint8).
-   """
+   """Normalize a tensor to uint8 if needed and write it as a PNG file."""
    x = tf.convert_to_tensor(img)
    if x.dtype != tf.uint8:
       if x.dtype.is_floating:
