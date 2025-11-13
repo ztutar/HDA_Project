@@ -228,27 +228,6 @@ def train_ROI_CNN(
    logger.info("Model summary:\n%s", summary_stream.getvalue())
 
    # -----------------------
-   # Save model results & metrics
-   # -----------------------
-   model_results_dict = {
-      "num_params": num_params,
-      "training_time": training_time,
-      "num_epochs_ran": num_epochs_ran,
-      "best_epoch_idx": best_epoch_idx
-   }
-   model_metrics_dict = {
-      "history": history.history,
-      "train_loss": history.history["loss"][best_epoch_idx],
-      "train_mae": history.history["mae"][best_epoch_idx],
-      "train_rmse": history.history["rmse"][best_epoch_idx],
-      "val_loss": history.history["val_loss"][best_epoch_idx],
-      "val_mae": history.history["val_mae"][best_epoch_idx],
-      "val_rmse": history.history["val_rmse"][best_epoch_idx],
-   }
-   save_model_dicts(model_results_dict, os.path.join(save_dir, "model_results.json"))
-   save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json"))
-
-   # -----------------------
    # Test Evaluation (optional)
    # -----------------------
    perform_test = training_cfg.perform_test
@@ -277,12 +256,6 @@ def train_ROI_CNN(
          test_mae,
          test_rmse,
       )
-      model_metrics_dict.update({
-         "test_loss": test_metrics["loss"],
-         "test_mae": test_metrics["mae"],
-         "test_rmse": test_metrics["rmse"]
-      })
-      save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json")) 
    else:
       logger.info(
          "Skipping test evaluation because training.perform_test is %s.",
@@ -330,6 +303,33 @@ def train_ROI_CNN(
       config_bundle=config_bundle,
    )
    logger.info("Appended training summary to %s", results_csv)
+   
+   # -----------------------
+   # Save model results & metrics
+   # -----------------------
+   model_results_dict = {
+      "num_params": num_params,
+      "training_time": training_time,
+      "num_epochs_ran": num_epochs_ran,
+      "best_epoch_idx": best_epoch_idx
+   }
+   model_metrics_dict = {
+      "history": history.history,
+      "train_loss": history.history["loss"][best_epoch_idx],
+      "train_mae": history.history["mae"][best_epoch_idx],
+      "train_rmse": history.history["rmse"][best_epoch_idx],
+      "val_loss": history.history["val_loss"][best_epoch_idx],
+      "val_mae": history.history["val_mae"][best_epoch_idx],
+      "val_rmse": history.history["val_rmse"][best_epoch_idx],
+   }
+   if perform_test:
+      model_metrics_dict.update({
+         "test_loss": test_metrics,
+         "test_mae": test_mae,
+         "test_rmse": test_rmse
+      })
+   save_model_dicts(model_results_dict, os.path.join(save_dir, "model_results.json"))
+   save_model_dicts(model_metrics_dict, os.path.join(save_dir, "model_metrics.json"))
    
    # -----------------------
    # Cleanup
