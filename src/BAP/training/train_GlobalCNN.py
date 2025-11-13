@@ -152,7 +152,7 @@ def train_GlobalCNN(
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
-      factor=0.25,
+      factor=0.5,
       patience=4, 
       min_lr=1e-6, 
       verbose=1
@@ -223,7 +223,7 @@ def train_GlobalCNN(
       test_mae = float(test_metrics.get("mae", float("nan")))
       test_rmse = float(test_metrics.get("rmse", float("nan")))
       logger.info(
-         "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
+         "Test metrics — MAE: %.4f, RMSE: %.4f",
          test_mae,
          test_rmse,
       )     
