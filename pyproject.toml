@@ -12,8 +12,8 @@ authors = [{ name = "Zeynep Tutar" }]
 dependencies = [
     "pandas",
     "numpy",
-    "tensorflow",
     "opencv-python",
+    "tensorflow",
     "tqdm",
     "keras",
     "ipython",
@@ -27,9 +27,3 @@ dependencies = [
     "graphviz",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["BAP*"]
