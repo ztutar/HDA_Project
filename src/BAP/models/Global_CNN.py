@@ -1,6 +1,16 @@
 
-#TODO: add docstring explanation for this module. write in details and explain each function and class
+"""Global convolutional neural network used for bone age regression.
 
+This module defines a single factory function, `build_GlobalCNN`, that assembles
+the end-to-end Keras model. The network stacks multiple convolutional blocks
+with BatchNorm and ReLU activations, downsamples via max pooling, aggregates
+features with global average pooling, and projects them through a dense head for
+age prediction. Optional gender metadata is embedded and concatenated prior to
+the regression head so structured inputs can modulate the prediction. The
+function exposes tunable hyperparameters (input shape, channel widths, dense
+units, dropout, gender flag) so experiments can reuse a consistent topology
+while adjusting capacity.
+"""
 
 from typing import Sequence, Tuple
 import tensorflow as tf
@@ -16,17 +26,30 @@ def build_GlobalCNN(
    dropout_rate: float = 0.2,
    use_gender: bool = False
 ) -> Model:
-   """
-   Build the B0 Global CNN model for bone age prediction from full images.
+   """Construct the Global CNN with optional gender metadata.
+
+   The network is organized as a stack of convolutional blocks that each apply
+   two `Conv2D → BatchNorm → ReLU` sequences followed by max pooling, producing
+   progressively coarser yet wider feature maps whose widths are drawn from the
+   `channels` tuple. Global average pooling collapses the spatial dimension into
+   a single feature vector that feeds a dense regression head. When `use_gender`
+   is enabled, the function also adds an integer gender input, embeds it into an
+   8-d vector, and concatenates it with the pooled visual features so the model
+   can leverage demographic priors before the dense layers.
+
    Args:
-      input_shape (Tuple[int, int, int], optional): Input image shape. Defaults to (512, 512, 1).
-      channels (Sequence[int], optional): Conv channels per block. Defaults to (32, 64, 128).
-      dense_units (int, optional): Dense units before regression. Defaults to 64.
-      use_gender (bool, optional): If True, include gender embedding. Defaults to False.
+      input_shape: Height, width, and channel count for the radiograph tensor.
+      channels: Number of filters for each convolutional block; also controls
+         the number of blocks because one block is created per entry.
+      dense_units: Width of the penultimate `Dense` layer preceding regression.
+      dropout_rate: Dropout probability applied before the dense head; set to 0
+         to disable the layer.
+      use_gender: If True, expect an additional gender input and inject its 
+      learned embedding into the pooled features.
+
    Returns:
-      Model: Compiled model mapping images -> age (months).
-                  Inputs: {"image": [B,H,W,1], "gender": [B,]}
-                  Output: [B,1] age (months)
+      A compiled Keras `Model` that maps image (and optional gender) inputs to a
+      scalar age prediction in months.
    """
    input_image = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
    

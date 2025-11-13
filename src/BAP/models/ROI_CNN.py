@@ -1,5 +1,11 @@
-#TODO: add docstring explanation for this module. write in details and explain each function and class
+"""Region-of-interest CNN components for wrist bone-age regression.
 
+The module exposes:
+1. `build_ROI_CNN`, which wires together carpal and metacarpal ROI branches
+   (and an optional gender embedding) to output a scalar age prediction.
+2. `ROI_CNN_head`, a reusable convolutional encoder used by each branch for
+   retaining spatial context.
+"""
 
 from typing import Sequence, Tuple
 import tensorflow as tf
@@ -15,20 +21,25 @@ def build_ROI_CNN(
    dropout_rate: float = 0.2,
    use_gender: bool = False,
 ) -> Model:
-   """
-   Build the ROI-only model with two inputs (carpal, metacarpal/phalange).
-   Features from both heads are concatenated and regressed to age.
+   """Assemble the dual-branch ROI CNN and return a Keras model.
+
+   The carpal and metacarpal crops pass through identical ROI heads, their
+   embeddings are concatenated, and an optional gender embedding can be
+   appended before the final dense layers emit the age estimate. The function
+   keeps the graph compact but configurable, allowing callers to tweak
+   channel widths, dense size, or dropout.
 
    Args:
-      roi_shape (Tuple[int, int, int], optional): Per-ROI crop shape. Defaults to (224, 224, 1).
-      channels (Sequence[int], optional): Conv channels for each head stage. Defaults to [32, 64].
-      dense_units (int, optional): Dense units for each head embedding. Defaults to 32.
-      use_gender (bool, optional): If True, include small gender embedding. Defaults to False.
+      roi_shape: Spatial shape for each ROI input tensor `(H, W, C)`.
+      channels: Sequence of filter counts per convolutional block in a head.
+      dense_units: Number of units in each ROI head's dense projection.
+      dropout_rate: Drop probability applied to concatenated features; set to
+         `0` to disable.
+      use_gender: If True, expect an additional gender input and inject its 
+      learned embedding into the pooled features.
 
    Returns:
-      Model: Compiled model mapping ROIs -> age (months).
-                  Inputs: {"carpal": [B,H,W,1], "metaph": [B,H,W,1], "gender": [B,]}
-                  Output: [B,1] age (months)  
+      Keras `Model` that maps ROI inputs (and optional gender) to age in months.
    """
    
    input_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
@@ -71,17 +82,25 @@ def ROI_CNN_head (
    dense_units: int = 32,
    name: str = "carpal"
 ) -> tf.Tensor:
-   """
-   A CNN head for a ROI crop.
+   """Encode an ROI tensor into a compact feature vector.
+
+   Each entry in `channels` creates a block with two Conv-BN-ReLU layers
+   followed by 2x2 max pooling, progressively reducing the spatial resolution
+   and increasing the receptive field. After the blocks, the tensor goes through
+   global average pooling and a dense projection that yields the final ROI
+   embedding suitable for concatenation within `build_ROI_CNN`.
 
    Args:
-      x (tf.Tensor): ROI image [B, H, W, 1] float32.
-      channels (Sequence[int]): e.g. [32, 64]
-      dense_units (int): Units in the per-ROI embedding.
+      x: Input ROI tensor shaped `[batch, height, width, channels]`.
+      channels: Filter counts assigned to consecutive convolutional blocks.
+      dense_units: Size of the dense layer applied post pooling.
+      name: Prefix added to layer names for traceability when multiple heads
+         coexist in the same model.
 
    Returns:
-      tf.Tensor: ROI feature embedding [B, dense_units].
+      Tensor of shape `[batch, dense_units]` representing the ROI features.
    """
+
 
    for i, ch in enumerate(channels):
       x = layers.Conv2D(

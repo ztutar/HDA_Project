@@ -1,12 +1,7 @@
+"""Helper utilities for constructing the standard training callbacks.
 
-"""
-Provide a helper for constructing the standard callback suite used during model
-training. The module focuses on assembling TensorFlow Keras callbacks that
-handle saving the best checkpoint, stopping training early when validation
-metrics stall, and recording logs for TensorBoard visualization. The primary
-entry point is `make_callbacks`, which prepares the filesystem paths, creates
-each callback object with the project’s preferred settings, and returns them as
-an ordered list ready to pass into `model.fit`.
+This module centralizes the wiring of every callback used when training the
+bone age prediction models.
 """
 
 from typing import List
@@ -15,17 +10,32 @@ from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping, TensorBoar
 
 
 def make_callbacks(save_dir: str, model_name: str = "model", patience: int = 10) -> List[Callback]:
-   """
-   Creates a list of Keras callbacks for training: Checkpoint, EarlyStopping, TensorBoard 
+   """Create the default set of Keras callbacks for model training. The function 
+   creates the `save_dir` if it does not exist, making it safe to call in fresh 
+   experiment folders. The callbacks use validation MAE as the optimization signal 
+   because the downstream evaluation focuses on that metric.
 
    Args:
-      save_dir (str): Directory to save model checkpoints and logs.
-      model_name (str, optional): Used to name the checkpoint file (e.g., "b0_global", "r1_roi").
-      patience (int, optional): Number of epochs with no improvement after which training will be stopped. Defaults to 10.
+      save_dir:
+         Directory where artifacts such as checkpoints and logs are stored.
+      model_name:
+         Prefix used to name each saved artifact so multiple experiments can share
+         the same parent directory without overwriting one another.
+      patience:
+         Number of epochs without validation improvement tolerated by the
+         `EarlyStopping` callback before training is halted.
 
    Returns:
-      List[tf.keras.callbacks.Callback]: List of callbacks to pass into model.fit().
+      List[Callback]
+         A list containing, in order:
+            1. `ModelCheckpoint` that stores the best validation-MAE model.
+            2. `EarlyStopping` that restores the best weights once patience is
+               exhausted.
+            3. `TensorBoard` writer for interactive experiment inspection.
+            4. `CSVLogger` that appends epoch-level metrics to disk.
+
    """
+
    os.makedirs(save_dir, exist_ok=True)
    checkpoint_path = os.path.join(save_dir, f"{model_name}_best.keras")
    tb_logs_path = os.path.join(save_dir, f"{model_name}_tensorboard_logs")

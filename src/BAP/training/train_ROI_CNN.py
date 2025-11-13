@@ -1,8 +1,13 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
+"""End-to-end trainer for the ROI-specific CNN branch of the bone-age pipeline.
 
+The module orchestrates ROI crop generation, TensorFlow dataset assembly, mixed
+precision model construction, training and optional test evaluation, metric
+logging, as well as persistence of both metrics and experiment summaries.
+Everything required to reproduce an ROI-CNN experiment is encapsulated here so
+callers only need to supply filesystem paths and a `ProjectConfig`.
+"""
 
 from typing import Tuple
-from dataclasses import asdict
 import os
 import gc
 import io
@@ -33,8 +38,46 @@ def train_ROI_CNN(
    config_bundle: ProjectConfig, 
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   
-   #TODO: add docstring explanation for this function. write in details and explain each step
+   """Train the ROI-CNN model, including ROI extraction, datasets, and reports.
+
+   Parameters
+   ----------
+   paths:
+      Mapping from split names (``"train"``, ``"validation"``, ``"test"``) to
+      their raw DICOM/PNG directories. Used when ROIs must be re-generated.
+   config_bundle:
+      Fully-populated :class:`~BAP.utils.config.ProjectConfig` holding data,
+      ROI, model, and training hyperparameters. These sub-configs drive ROI
+      loader behavior, model architecture, optimizer setup, callbacks, and
+      summary bookkeeping.
+   save_dir:
+      Destination directory where checkpoints, histories, and JSON summaries are
+      written. The directory is expected to exist or be creatable by the caller.
+
+   Returns
+   -------
+   model, history:
+      The trained :class:`keras.Model` instance and its
+      :class:`keras.callbacks.History`. They can be used for downstream
+      inference or additional analysis.
+
+   Workflow
+   --------
+   1. Mirror stdout for Keras logs, load configs, and enforce mixed precision.
+   2. Ensure ROI crops exist (or call the locator to create them) for every
+      split, timing the extraction process.
+   3. Build TensorFlow datasets from ROI directories plus metadata CSVs, map
+      them into the multi-input signature expected by the ROI-CNN, and enable
+      pipelining via batching/prefetching.
+   4. Instantiate the ROI-CNN with the configured channel counts, dense units,
+      dropout, and optional gender branch; compile it with mixed-precision Adam,
+      Huber loss, and regression metrics.
+   5. Configure callbacks (checkpointing, early stopping, LR scheduling),
+      launch training, and optionally evaluate on the test set.
+   6. Record best-epoch metrics into a CSV summary, persist detailed histories
+      as JSON, log a model summary, and clean up TensorFlow state to avoid GPU
+      memory leaks.
+   """
 
    mirror_keras_stdout_to_file()
 

@@ -1,8 +1,18 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
+"""
+Training entry point for the GlobalCNN model.
+
+This module orchestrates the full lifecycle of a Global convolutional neural
+network used for bone-age prediction. It prepares tf.data pipelines for the
+train/validation/test splits, builds the GlobalCNN architecture via
+`build_GlobalCNN`, compiles it with mixed precision, and attaches callbacks
+defined in `BAP.training.callbacks`. After training, it optionally evaluates on
+the test split, logs a detailed summary, and appends a CSV summary . The module 
+exposes a single public function, `train_GlobalCNN`, which encapsulates these 
+responsibilities and returns the trained Keras model together with its History object.
+"""
 
 
 from typing import Tuple
-from dataclasses import asdict
 import gc
 import io
 import os
@@ -30,7 +40,42 @@ def train_GlobalCNN(
    config_bundle: ProjectConfig, 
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   #TODO: add docstring explanation for this function. write in details and explain each step
+   """
+   Train, evaluate, and persist a GlobalCNN instance.
+
+   Parameters
+   ----------
+   paths : dict
+      Mapping that points to image directories for train/val (and optionally
+      test) splits. Keys are expected to include `train`, `val`, and `test`.
+   config_bundle : ProjectConfig
+      Structured configuration containing data, model, and training sections.
+      Controls dataset construction (image size, batching, augmentations),
+      model architecture (channels, dense units, dropout, gender usage), and
+      training hyperparameters (learning rate, epochs, patience, logging paths).
+   save_dir : str
+      Destination directory where checkpoints, metrics, and summaries will be
+      persisted.
+
+   Returns
+   -------
+   Tuple[keras.Model, keras.callbacks.History]
+      The trained model along with the Keras History capturing per-epoch logs.
+
+   Workflow
+   --------
+   1. Mirror stdout to file for reproducible logs and enforce mixed precision.
+   2. Build train/val tf.data pipelines with metadata-driven labels, optional
+      augmentation, and prefetching for throughput.
+   3. Instantiate GlobalCNN via `build_GlobalCNN` with config-driven topology.
+   4. Compile with an Adam optimizer (wrapped in loss scaling), Huber loss, and
+      MAE/RMSE metrics.
+   5. Set up callbacks (checkpoints, early stopping, LR scheduling) and launch
+      training while timing the run.
+   6. Optionally evaluate on the test split, gather best-epoch statistics, log
+      summaries, and append results to the experiment CSV.
+   7. Persist model metadata/metrics JSON files and return the trained artifacts.
+   """
 
    mirror_keras_stdout_to_file()
    

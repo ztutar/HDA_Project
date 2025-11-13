@@ -1,5 +1,4 @@
-#TODO: add docstring explanation for this module. write in details and explain each function
-
+#TODO: add docstring explanation for this module and it's functions. Write in details.
 
 import tensorflow as tf
 from keras import Model, layers
@@ -10,21 +9,6 @@ def compute_GradCAM(
          model: Model,
          image: tf.Tensor,
 ) -> tf.Tensor:
-   """
-   Compute a Grad-CAM (Gradient-weighted Class Activation Mapping) heatmap for
-   a single input according to the canonical Keras implementation.
-
-   Args:
-      model (keras.Model): Trained Keras model mapping [B,H,W,C] -> [B,K].
-      image (tf.Tensor): Image tensor of shape [H,W,C], dtype float32.
-      target_layer_name (Optional[str]): Name of the last conv layer. If None,
-         automatically pick the last Conv2D layer.
-      target_index (Optional[int]): Index of the output neuron to explain. If None,
-         uses the argmax for multi-output models or 0 for single-output models.
-
-   Returns:
-      tf.Tensor: Heatmap tensor of shape [H,W] with values scaled to [0,1].
-   """
 
    image = tf.convert_to_tensor(image, dtype=tf.float32)
    if image.shape.rank == 2:
@@ -110,21 +94,7 @@ def compute_GradCAM_plus(
          model: Model,
          image: tf.Tensor,
 ) -> tf.Tensor:
-   """
-   Compute a Grad-CAM (Gradient-weighted Class Activation Mapping) heatmap for
-   a single input according to the canonical Keras implementation.
 
-   Args:
-      model (keras.Model): Trained Keras model mapping [B,H,W,C] -> [B,K].
-      image (tf.Tensor): Image tensor of shape [H,W,C], dtype float32.
-      target_layer_name (Optional[str]): Name of the last conv layer. If None,
-         automatically pick the last Conv2D layer.
-      target_index (Optional[int]): Index of the output neuron to explain. If None,
-         uses the argmax for multi-output models or 0 for single-output models.
-
-   Returns:
-      tf.Tensor: Heatmap tensor of shape [H,W] with values scaled to [0,1].
-   """
 
    image = tf.convert_to_tensor(image, dtype=tf.float32)
    if image.shape.rank == 2:
