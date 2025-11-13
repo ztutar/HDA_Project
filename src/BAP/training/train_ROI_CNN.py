@@ -252,7 +252,7 @@ def train_ROI_CNN(
       test_mae = float(test_metrics.get("mae", float("nan")))
       test_rmse = float(test_metrics.get("rmse", float("nan")))
       logger.info(
-         "Test metrics — loss: %.4f, MAE: %.4f, RMSE: %.4f",
+         "Test metrics — MAE: %.4f, RMSE: %.4f",
          test_mae,
          test_rmse,
       )
