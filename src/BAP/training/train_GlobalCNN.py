@@ -128,6 +128,7 @@ def train_GlobalCNN(
 
    train_ds = train_ds.map(
       lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
+                              "image_viz": features["image_viz"],
                               "gender": tf.cast(features["gender"], tf.int32)}, age),
       num_parallel_calls=tf.data.AUTOTUNE,
    )
@@ -136,6 +137,7 @@ def train_GlobalCNN(
 
    val_ds = val_ds.map(
       lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
+                              "image_viz": features["image_viz"],
                               "gender": tf.cast(features["gender"], tf.int32)}, age),
       num_parallel_calls=tf.data.AUTOTUNE,
    )
@@ -197,7 +199,7 @@ def train_GlobalCNN(
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
-      factor=0.8,
+      factor=0.2,
       patience=3, 
       min_lr=1e-6, 
       verbose=1
@@ -259,6 +261,7 @@ def train_GlobalCNN(
       )
       test_ds = test_ds.map(
          lambda features, age: ({"image_id": features["image_id"], "image": features["image"],
+                                 "image_viz": features["image_viz"],
                                  "gender": tf.cast(features["gender"], tf.int32)}, age),
          num_parallel_calls=tf.data.AUTOTUNE,
       )
