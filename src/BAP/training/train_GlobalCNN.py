@@ -197,8 +197,8 @@ def train_GlobalCNN(
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
-      factor=0.5,
-      patience=4, 
+      factor=0.8,
+      patience=3, 
       min_lr=1e-6, 
       verbose=1
    )
