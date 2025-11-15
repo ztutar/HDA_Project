@@ -35,7 +35,7 @@ def get_rsna_dataset(force_download=False) -> dict[str, Path]:
    return {
       "root": root,
       "train": root / "RSNA_train/images",
-      "val": root / "RSNA_val/images",
+      "validation": root / "RSNA_val/images",
       "test": root / "RSNA_test/images",
    }
    

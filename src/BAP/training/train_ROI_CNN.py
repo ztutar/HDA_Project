@@ -96,6 +96,9 @@ def train_ROI_CNN(
    if keras.mixed_precision.global_policy().name != policy_name:
       keras.mixed_precision.set_global_policy(policy_name)
       logger.info("Set mixed-precision policy to %s", policy_name)
+   
+   model_results_dict = {}
+   model_metrics_dict = {}
 
    # -----------------------
    # ROI Locator & Extractor
@@ -109,7 +112,7 @@ def train_ROI_CNN(
    # Generate crops for each split (train/val/test) if not already present
    roi_extraction_time = 0.0
    roi_paths = {}
-   for split in ["train", "val", "test"]:
+   for split in ["train", "validation", "test"]:
       carpal_dir = os.path.join(roi_path, split, "carpal")
       metaph_dir = os.path.join(roi_path, split, "metaph")
       heatmaps_dir = os.path.join(roi_path, split, "heatmaps")
@@ -129,6 +132,8 @@ def train_ROI_CNN(
          )
          roi_time_end = time.time()
          roi_extraction_time += roi_time_end - roi_time_start
+         model_results_dict["roi_extraction_time"] = roi_extraction_time
+
    logger.info("Total ROI extraction time: %.2fs", roi_extraction_time)
 
    # -----------------------
@@ -350,13 +355,13 @@ def train_ROI_CNN(
    # -----------------------
    # Save model results & metrics
    # -----------------------
-   model_results_dict = {
+   model_results_dict["ROI_CNN"] = {
       "num_params": num_params,
       "training_time": training_time,
       "num_epochs_ran": num_epochs_ran,
       "best_epoch_idx": best_epoch_idx
    }
-   model_metrics_dict = {
+   model_metrics_dict["ROI_CNN"] = {
       "history": history.history,
       "train_loss": history.history["loss"][best_epoch_idx],
       "train_mae": history.history["mae"][best_epoch_idx],
@@ -366,7 +371,7 @@ def train_ROI_CNN(
       "val_rmse": history.history["val_rmse"][best_epoch_idx],
    }
    if perform_test:
-      model_metrics_dict.update({
+      model_metrics_dict["ROI_CNN"].update({
          "test_loss": test_metrics,
          "test_mae": test_mae,
          "test_rmse": test_rmse

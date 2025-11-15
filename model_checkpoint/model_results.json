@@ -1,15 +1,15 @@
 {
   "GlobalCNN": {
-    "num_params": 296097,
-    "training_time": 16068.294677972794,
-    "num_epochs_ran": 33,
-    "best_epoch_idx": 22
+  "num_params": 296097,
+  "training_time": 21481.622017383575,
+  "num_epochs_ran": 43,
+  "best_epoch_idx": 32
   },
   "GlobalCNN_Gender": {
-    "num_params": 296625,
-    "training_time": 15508.165995121002,
-    "num_epochs_ran": 32,
-    "best_epoch_idx": 21
+  "num_params": 296625,
+  "training_time": 18106.40475130081,
+  "num_epochs_ran": 35,
+  "best_epoch_idx": 24
   },
   "ROI_CNN": {
     "num_params": 608705,

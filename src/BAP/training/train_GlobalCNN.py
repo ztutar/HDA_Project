@@ -91,13 +91,16 @@ def train_GlobalCNN(
    if keras.mixed_precision.global_policy().name != policy_name:
       keras.mixed_precision.set_global_policy(policy_name)
       logger.info("Set mixed-precision policy to %s", policy_name)
+      
+   model_results_dict = {}
+   model_metrics_dict = {}
 
    # -----------------------
    # Data
    # -----------------------
    # Define image directories
    train_image_dir = Path(paths["train"])
-   val_image_dir = Path(paths["val"])
+   val_image_dir = Path(paths["validation"])
    
    # Define csv directories
    train_metadata = pd.read_csv("data/metadata/train.csv")
@@ -326,13 +329,13 @@ def train_GlobalCNN(
    # -----------------------
    # Save model results & metrics
    # -----------------------
-   model_results_dict = {
+   model_results_dict["GlobalCNN"] = {
       "num_params": num_params,
       "training_time": training_time,
       "num_epochs_ran": num_epochs_ran,
       "best_epoch_idx": best_epoch_idx
    }
-   model_metrics_dict = {
+   model_metrics_dict["GlobalCNN"] = {
       "history": history.history,
       "train_loss": history.history["loss"][best_epoch_idx],
       "train_mae": history.history["mae"][best_epoch_idx],
@@ -342,7 +345,7 @@ def train_GlobalCNN(
       "val_rmse": history.history["val_rmse"][best_epoch_idx],
    }
    if perform_test:
-      model_metrics_dict.update({
+      model_metrics_dict["GlobalCNN"].update({
          "test_loss": test_metrics,
          "test_mae": test_mae,
          "test_rmse": test_rmse
