@@ -1,6 +1,6 @@
 data:
   image_size: 256
-  clahe: true
+  clahe: false
   augment: false
   batch_size: 16
 
