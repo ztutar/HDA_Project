@@ -109,7 +109,7 @@ def train_ROI_CNN(
    # Generate crops for each split (train/val/test) if not already present
    roi_extraction_time = 0.0
    roi_paths = {}
-   for split in ["train", "validation", "test"]:
+   for split in ["train", "val", "test"]:
       carpal_dir = os.path.join(roi_path, split, "carpal")
       metaph_dir = os.path.join(roi_path, split, "metaph")
       heatmaps_dir = os.path.join(roi_path, split, "heatmaps")
