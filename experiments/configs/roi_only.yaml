@@ -8,7 +8,7 @@ data:
 roi:
   locator:
     roi_path: "data/cropped_rois"  # where ROI crops will be saved
-    pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_09/GlobalCNN_best.keras" # model should be trained w/0 gender data
+    pretrained_model_path: "GlobalCNN/global_only/GlobalCNN_global_only_02/GlobalCNN_best.keras" # model should be trained w/0 gender data
   extractor:
     roi_size: 128            # saved crop size (square)
     heatmap_threshold: 0.25   # minimal normalized CAM value to accept a peak
