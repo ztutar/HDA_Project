@@ -227,8 +227,8 @@ def train_ROI_CNN(
    # learning rate schedule
    reduce_lr = keras.callbacks.ReduceLROnPlateau(
       monitor='val_mae', 
-      factor=0.25,
-      patience=4, 
+      factor=0.2,
+      patience=3, 
       min_lr=1e-6, 
       verbose=1
    )
