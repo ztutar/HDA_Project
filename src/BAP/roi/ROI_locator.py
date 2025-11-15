@@ -149,7 +149,7 @@ def train_locator_and_save_rois(
 
       # Optionally save heatmap overlay
       if save_heatmaps:
-         overlay_rgb = overlay_cam_on_image(gray_img=image, cam=cam)
+         overlay_rgb = overlay_cam_on_image(gray_img=image_viz, cam=cam)
          _save_png(os.path.join(heatmap_dir, f"{img_id}.png"), overlay_rgb)
 
 
