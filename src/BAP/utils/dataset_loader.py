@@ -90,7 +90,8 @@ def make_dataset(
       if augment:
          image = _augment_image(image)
          
-      image_viz = tf.clip_by_value(image, 0.0, 1.0)
+      #image_viz = tf.clip_by_value(image, 0.0, 1.0)
+      image_viz = image
       image = _zscore_norm(image)
 
       features = {

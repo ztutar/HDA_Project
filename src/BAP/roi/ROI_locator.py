@@ -122,6 +122,7 @@ def train_locator_and_save_rois(
    # --- Iterate once over split, save crops
    for features, _ in ds:
       image = features["image"]                        # [H,W,1] 
+      image_viz =features.get("image_viz", image)      # [H,W,1], float32 in [0,1]
       image_id = features["image_id"]                  
       
       # Compute Grad-CAM on the locator
@@ -132,7 +133,7 @@ def train_locator_and_save_rois(
       heatmap_threshold=extractor_cfg.heatmap_threshold
       rois = extract_rois_from_heatmap(
             heatmap=cam,
-            image=image,
+            image=image_viz,
             roi_size=roi_size,
             carpal_margin=0.48, # extra border around peak box (fraction of shorter side)
             meta_mask_radius=0.35, # mask radius (fraction of shorter side) to hide carpal when finding metacarpal
