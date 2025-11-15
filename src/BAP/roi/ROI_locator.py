@@ -159,7 +159,7 @@ def _save_png(path: str, img: tf.Tensor) -> None:
    x = tf.convert_to_tensor(img)
    if x.dtype != tf.uint8:
       if x.dtype.is_floating:
-         x = tf.clip_by_value(x, 0.0, 1.0)
+         #x = tf.clip_by_value(x, 0.0, 1.0)
          x = tf.image.convert_image_dtype(x, dtype=tf.uint8)
       else:
          x = tf.cast(x, tf.uint8)
