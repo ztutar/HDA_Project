@@ -22,7 +22,7 @@ model:
   roi_dense_units: 64
   fusion_dense_units: [128, 64]
   dropout_rate: 0.2
-  use_gender: true
+  use_gender: false
 
 training:
   epochs: 5
