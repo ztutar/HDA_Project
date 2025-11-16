@@ -275,7 +275,7 @@ def train_FusionCNN(
       monitor='val_mae', 
       factor=0.2,
       patience=3, 
-      #min_lr=1e-6, 
+      min_lr=1e-6, 
       verbose=1
    )
    callbacks.append(reduce_lr)
