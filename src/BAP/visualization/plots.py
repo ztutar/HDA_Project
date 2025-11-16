@@ -75,7 +75,7 @@ def plot_distributions(metadata: Union[pd.DataFrame, Dict[str, pd.DataFrame]]) -
    split_names = list(splits.keys())
    num_splits = len(split_names)
 
-   fig, axes = plt.subplots(2, num_splits, figsize=(5 * num_splits + 2, 8), sharey="row")
+   fig, axes = plt.subplots(2, num_splits, figsize=(5 * num_splits + 2, 8))
    axes = np.atleast_2d(axes)
 
    for col_idx, split_name in enumerate(split_names):
