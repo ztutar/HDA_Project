@@ -54,31 +54,49 @@ def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: in
    plt.show()
    
    
-def plot_distributions(metadata: pd.DataFrame) -> None:
+def plot_distributions(metadata: Union[pd.DataFrame, Dict[str, pd.DataFrame]]) -> None:
    """
-   Plot aggregated dataset distributions for bone age (histogram) and gender.
+   Plot bone age and gender distributions for each dataset split.
 
    Args:
-      metadata (pd.DataFrame): Metadata table containing ``Bone Age (months)`` and ``male``.
+      metadata (Union[pd.DataFrame, Dict[str, pd.DataFrame]]): Either a single metadata
+         table (for backward compatibility) or a mapping of split name to metadata
+         DataFrame. Each DataFrame must contain ``Bone Age (months)`` and ``male``.
    """
-   plt.figure(figsize=(10, 4))
+   # Accept legacy single-DataFrame input by wrapping it in a dict
+   if isinstance(metadata, dict):
+      splits: Dict[str, pd.DataFrame] = metadata
+   else:
+      splits = {"All": metadata}
 
-   # Distribution of Bone Age
-   plt.subplot(1, 2, 1)
-   sns.histplot(metadata["Bone Age (months)"], kde=True, bins=30)
-   plt.title("Distribution of Bone Age")
-   plt.xlabel("Bone Age (months)")
-   plt.ylabel("Frequency")
+   if not splits:
+      raise ValueError("metadata must contain at least one split/DataFrame.")
 
-   # Distribution of Gender
-   plt.subplot(1, 2, 2)
-   sns.countplot(x="male", data=metadata)
-   plt.title("Distribution of Gender")
-   plt.xlabel("Gender")
-   plt.ylabel("Count")
-   plt.xticks(ticks=[0, 1], labels=["Female", "Male"])
+   split_names = list(splits.keys())
+   num_splits = len(split_names)
 
-   plt.tight_layout()
+   fig, axes = plt.subplots(2, num_splits, figsize=(5 * num_splits + 2, 8), sharey="row")
+   axes = np.atleast_2d(axes)
+
+   for col_idx, split_name in enumerate(split_names):
+      df = splits[split_name]
+      bone_ax = axes[0, col_idx]
+      gender_ax = axes[1, col_idx]
+
+      sns.histplot(df["Bone Age (months)"], kde=True, bins=30, ax=bone_ax)
+      bone_ax.set_title(f"{split_name} Bone Age")
+      bone_ax.set_xlabel("Bone Age (months)")
+      bone_ax.set_ylabel("Frequency")
+
+      sns.countplot(x="male", data=df, ax=gender_ax)
+      gender_ax.set_title(f"{split_name} Gender Distribution")
+      gender_ax.set_xlabel("Gender")
+      gender_ax.set_ylabel("Count")
+      gender_ax.set_xticks(ticks=[0, 1])
+      gender_ax.set_xticklabels(["Female", "Male"])
+
+   fig.suptitle("Dataset Distributions by Split", fontsize=14)
+   plt.tight_layout(rect=[0, 0, 1, 0.96])
    plt.show()
 
 
