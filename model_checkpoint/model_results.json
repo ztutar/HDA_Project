@@ -13,17 +13,15 @@
   },
   "ROI_CNN": {
     "num_params": 608705,
-    "training_time": 6573.155463933945,
-    "num_epochs_ran": 44,
-    "best_epoch_idx": 33
+    "training_time": 7948.263306856155,
+    "num_epochs_ran": 60,
+    "best_epoch_idx": 49
   },
   "ROI_CNN_Gender": {
     "num_params": 609745,
-    "training_time": 6156.491012334824,
-    "num_epochs_ran": 41,
-    "best_epoch_idx": 30
+    "training_time": 5517.300566911697,
+    "num_epochs_ran": 49,
+    "best_epoch_idx": 38
   },
-  "roi_extraction": {
-    "roi_extraction_time": 1390.7393572330475
-  }
+  "roi_extraction_time": 1530.9100019931793
 }

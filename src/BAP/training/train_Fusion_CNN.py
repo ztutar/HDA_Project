@@ -185,7 +185,7 @@ def train_FusionCNN(
       clahe=clahe,
       augment=False,
    )
-   logger.info("Prepared fusion training and validation datasets from %s", data_cfg.data_path)
+   logger.info("Prepared fusion training and validation datasets.")
 
    batch_size = data_cfg.batch_size
    train_ds = train_ds.map(
