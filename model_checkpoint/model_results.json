@@ -23,5 +23,17 @@
     "num_epochs_ran": 49,
     "best_epoch_idx": 38
   },
+  "Fusion_CNN": {
+    "num_params": 0,
+    "training_time": 0,
+    "num_epochs_ran": 0,
+    "best_epoch_idx": 0
+  },
+  "Fusion_CNN_Gender": {
+    "num_params": 0,
+    "training_time": 0,
+    "num_epochs_ran": 0,
+    "best_epoch_idx": 0
+  },
   "roi_extraction_time": 1530.9100019931793
 }

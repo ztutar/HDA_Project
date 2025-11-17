@@ -62,13 +62,11 @@ def build_ROI_CNN(
       name = "ROI_CNN"
       #logger.info("Building ROI-CNN model w/o gender input.")
 
-   if dropout_rate > 0:
-      x = layers.Dropout(rate=dropout_rate, name="dropout")(features) # [B,dense_units*2(+8)]
-   x = layers.Dense(
-      units=max(64, dense_units * 2), 
-      activation="relu",
-      name="dense"
-   )(x) # [B, max(64, dense_units*2)]
+   for idx, units in enumerate(dense_units):
+      if dropout_rate > 0:
+         x = layers.Dropout(rate=dropout_rate, name=f"dropout_{idx + 1}")(x) # [B, units]
+      x = layers.Dense(units=units, activation="relu", name=f"dense_{idx + 1}")(x) # [B, units]
+   
    output_age = layers.Dense(units=1, activation="linear", name="age_months", dtype=tf.float32)(x) # [B,1]
 
    model = Model(inputs=inputs, outputs=output_age, name=name)
@@ -126,5 +124,5 @@ def ROI_CNN_head (
       x = layers.MaxPool2D(pool_size=2, padding='same', name=f"{name}_roi_block{i+1}_pool")(x) # [B,H/2,W/2,ch]
 
    x = layers.GlobalAveragePooling2D(name=f"{name}_roi_global_avg_pool")(x) # [B,ch]
-   x = layers.Dense(dense_units, activation='relu', name=f"{name}_roi_dense")(x) # [B,dense_units]
+   #x = layers.Dense(dense_units, activation='relu', name=f"{name}_roi_dense")(x) # [B,dense_units]
    return x
