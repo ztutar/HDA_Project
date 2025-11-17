@@ -45,8 +45,8 @@ def build_ROI_CNN(
    input_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
    input_metp = layers.Input(shape=roi_shape, name="metaph") # [B,H,W,1]
 
-   feat_carp = ROI_CNN_head(input_carp, channels, dense_units, "carpal") # [B,dense_units]
-   feat_metp = ROI_CNN_head(input_metp, channels, dense_units, "metaph") # [B,dense_units]
+   feat_carp = ROI_CNN_head(input_carp, channels, 64, "carpal") # [B,dense_units]
+   feat_metp = ROI_CNN_head(input_metp, channels, 64, "metaph") # [B,dense_units]
 
    features = layers.Concatenate(name="ROI_heads_concat")([feat_carp, feat_metp]) # [B,dense_units*2]
    if use_gender:
@@ -126,5 +126,5 @@ def ROI_CNN_head (
       x = layers.MaxPool2D(pool_size=2, padding='same', name=f"{name}_roi_block{i+1}_pool")(x) # [B,H/2,W/2,ch]
 
    x = layers.GlobalAveragePooling2D(name=f"{name}_roi_global_avg_pool")(x) # [B,ch]
-   #x = layers.Dense(dense_units, activation='relu', name=f"{name}_roi_dense")(x) # [B,dense_units]
+   x = layers.Dense(dense_units, activation='relu', name=f"{name}_roi_dense")(x) # [B,dense_units]
    return x
