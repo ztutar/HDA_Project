@@ -62,6 +62,8 @@ def build_ROI_CNN(
       name = "ROI_CNN"
       #logger.info("Building ROI-CNN model w/o gender input.")
 
+   x = features
+
    for idx, units in enumerate(dense_units):
       if dropout_rate > 0:
          x = layers.Dropout(rate=dropout_rate, name=f"dropout_{idx + 1}")(x) # [B, units]
