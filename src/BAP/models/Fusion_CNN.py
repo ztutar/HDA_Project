@@ -70,6 +70,8 @@ def build_FusionCNN(
    metaph_input = layers.Input(shape=roi_shape, dtype=tf.float32, name="metaph") # [B,H,W,1]
    carpal_features = ROI_CNN_head(carpal_input, roi_channels, roi_dense_units, "carpal") # [B,roi_dense_units]
    metaph_features = ROI_CNN_head(metaph_input, roi_channels, roi_dense_units, "metaph") # [B,roi_dense_units]
+   carpal_features = layers.Dense(int(roi_dense_units/2), activation="relu", name="carpal_dense")(carpal_features) # [B,roi_dense_units/2]
+   metaph_features = layers.Dense(int(roi_dense_units/2), activation="relu", name="metaph_dense")(metaph_features) # [B,roi_dense_units/2]
 
    fused = layers.Concatenate(name="fusion_concat")([global_features, carpal_features, metaph_features]) # [B, global_dense_units + roi_dense_units*2]
 
