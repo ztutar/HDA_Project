@@ -271,6 +271,7 @@ def train_GlobalCNN(
       test_ds = test_ds.batch(batch_size)
       test_ds = test_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
       test_metrics = model.evaluate(test_ds, return_dict=True, verbose=1)
+      test_loss = float(test_metrics.get("loss", float("nan")))
       test_mae = float(test_metrics.get("mae", float("nan")))
       test_rmse = float(test_metrics.get("rmse", float("nan")))
       logger.info(
@@ -346,7 +347,7 @@ def train_GlobalCNN(
    }
    if perform_test:
       model_metrics_dict["GlobalCNN"].update({
-         "test_loss": test_metrics,
+         "test_loss": test_loss,
          "test_mae": test_mae,
          "test_rmse": test_rmse
       })

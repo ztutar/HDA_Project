@@ -421,7 +421,7 @@ def train_FusionCNN(
    }
    if perform_test:
       model_metrics_dict["FusionCNN"].update({
-         "test_loss": test_metrics,
+         "test_loss": test_loss,
          "test_mae": test_mae,
          "test_rmse": test_rmse
       })
