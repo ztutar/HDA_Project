@@ -45,8 +45,8 @@ def build_ROI_CNN(
    input_carp = layers.Input(shape=roi_shape, name="carpal") # [B,H,W,1]
    input_metp = layers.Input(shape=roi_shape, name="metaph") # [B,H,W,1]
 
-   feat_carp = ROI_CNN_head(input_carp, channels, 64, "carpal") # [B,dense_units]
-   feat_metp = ROI_CNN_head(input_metp, channels, 64, "metaph") # [B,dense_units]
+   feat_carp = ROI_CNN_head(input_carp, channels, dense_units, "carpal") # [B,dense_units]
+   feat_metp = ROI_CNN_head(input_metp, channels, dense_units, "metaph") # [B,dense_units]
 
    features = layers.Concatenate(name="ROI_heads_concat")([feat_carp, feat_metp]) # [B,dense_units*2]
    if use_gender:
@@ -62,12 +62,13 @@ def build_ROI_CNN(
       name = "ROI_CNN"
       #logger.info("Building ROI-CNN model w/o gender input.")
 
-   x = features
-
-   for idx, units in enumerate(dense_units):
-      if dropout_rate > 0:
-         x = layers.Dropout(rate=dropout_rate, name=f"dropout_{idx + 1}")(x) # [B, units]
-      x = layers.Dense(units=units, activation="relu", name=f"dense_{idx + 1}")(x) # [B, units]
+   if dropout_rate > 0:
+      x = layers.Dropout(rate=dropout_rate, name="dropout")(features) # [B,dense_units*2(+8)]
+   x = layers.Dense(
+      units=dense_units, 
+      activation="relu",
+      name="dense"
+   )(x) # [B, max(64, dense_units*2)]
    
    output_age = layers.Dense(units=1, activation="linear", name="age_months", dtype=tf.float32)(x) # [B,1]
 
