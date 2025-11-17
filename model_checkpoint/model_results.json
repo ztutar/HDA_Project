@@ -24,16 +24,16 @@
     "best_epoch_idx": 38
   },
   "Fusion_CNN": {
-    "num_params": 0,
-    "training_time": 0,
-    "num_epochs_ran": 0,
-    "best_epoch_idx": 0
+    "num_params": 921121,
+    "training_time": 36101.144145965576,
+    "num_epochs_ran": 64,
+    "best_epoch_idx": 53
   },
   "Fusion_CNN_Gender": {
-    "num_params": 0,
-    "training_time": 0,
-    "num_epochs_ran": 0,
-    "best_epoch_idx": 0
+    "num_params": 922161,
+    "training_time": 29755.15017747879,
+    "num_epochs_ran": 53,
+    "best_epoch_idx": 42
   },
   "roi_extraction_time": 1530.9100019931793
 }
