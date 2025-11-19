@@ -17,9 +17,9 @@ roi:
 # ---------- Fusion Model ----------
 model:
   global_channels: [32, 64, 128]
-  global_dense_units: 64
-  roi_channels: [32, 64, 128]
-  roi_dense_units: 64
+  global_dense_units: 0
+  roi_channels: [32, 64]
+  roi_dense_units: 32
   fusion_dense_units: [128, 64]
   dropout_rate: 0.2
   use_gender: false

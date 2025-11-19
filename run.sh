@@ -1,4 +1,6 @@
 
+pip install -e .
+
 echo "Running FUSION model..."
 python main.py --model fusion_cnn --config fusion.yaml
 
