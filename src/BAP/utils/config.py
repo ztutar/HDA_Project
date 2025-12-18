@@ -30,6 +30,7 @@ class DataConfig:
 
 @dataclass
 class ModelConfig:
+   pretrained_backbone: Optional[str] = None # Path to pretrained weights for backbone
    global_channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    global_dense_units: int = 128
    roi_channels: list[int] = field(default_factory=lambda: [32, 64])
@@ -45,6 +46,7 @@ class TrainingConfig:
    learning_rate: float = 0.0003
    results_csv: str = "experiments/train_results_summary.csv"
    perform_test: bool = False
+   warmup_epochs: int = 0  # If >0, freeze transferred layers for this many epochs before fine-tuning
 
 @dataclass
 class ROILocatorConfig:

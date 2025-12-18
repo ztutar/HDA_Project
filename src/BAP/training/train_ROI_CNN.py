@@ -7,7 +7,7 @@ Everything required to reproduce an ROI-CNN experiment is encapsulated here so
 callers only need to supply filesystem paths and a `ProjectConfig`.
 """
 
-from typing import Tuple
+from typing import Tuple, Sequence
 import os
 import gc
 import io
@@ -27,6 +27,7 @@ from BAP.utils.path_manager import save_model_dicts
 from BAP.roi.ROI_locator import train_locator_and_save_rois
 
 from BAP.models.ROI_CNN import build_ROI_CNN
+from BAP.models.Global_CNN import build_GlobalCNN
 
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
@@ -185,7 +186,36 @@ def train_ROI_CNN(
    dense_units = model_cfg.roi_dense_units
    dropout_rate = model_cfg.dropout_rate
    use_gender = model_cfg.use_gender
-   
+
+   def init_roi_from_global(
+      roi_model: keras.Model,
+      ckpt_path: str,
+      input_shape: Tuple[int, int, int],
+      global_channels: Sequence[int],
+      roi_channels: Sequence[int],
+      use_gender: bool,
+   ) -> None:
+      """Copy conv weights from a pretrained Global CNN into both ROI heads."""
+      global_model = build_GlobalCNN(
+         input_shape=input_shape,
+         channels=global_channels,
+         dense_units=roi_model.get_layer("dense").units,  # only needed to build
+         dropout_rate=0,
+         use_gender=use_gender,
+      )
+      global_model.load_weights(ckpt_path)
+
+      num_blocks = min(len(roi_channels), len(global_channels))
+      for i in range(num_blocks):
+         src_idx = i + 1
+         for head in ("carpal", "metaph"):
+            for suffix in ("conv1", "bn1", "conv2", "bn2"):
+               target_layer = f"{head}_roi_block{src_idx}_{suffix}"
+               source_layer = f"conv_block_{src_idx}_{suffix}"
+               roi_model.get_layer(target_layer).set_weights(
+                  global_model.get_layer(source_layer).get_weights()
+               )
+
    model = build_ROI_CNN(
       roi_shape=roi_shape,
       channels=channels,
@@ -193,6 +223,21 @@ def train_ROI_CNN(
       dropout_rate=dropout_rate,
       use_gender=use_gender,
    )
+
+   ckpt_path = model_cfg.pretrained_backbone
+   if ckpt_path:
+      init_roi_from_global(
+         roi_model=model,
+         ckpt_path=ckpt_path,
+         input_shape=(data_cfg.image_size, data_cfg.image_size, 1),
+         global_channels=model_cfg.global_channels,
+         roi_channels=channels,
+         use_gender=use_gender,
+      )
+      logger.info(
+         "Initialized ROI-CNN heads from pretrained GlobalCNN at %s",
+         ckpt_path,
+      )
    
    # -----------------------
    # Optimizer (Adam, fixed LR)
