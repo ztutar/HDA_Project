@@ -1,10 +1,13 @@
 
 pip install -e .
 
-python main.py --model inception --config inception.yaml
+echo "▶️  Starting training for Base CNN model..."
+python main.py --model base_cnn --config base.yaml
 
-python main.py --model densenet --config densenet.yaml
+echo "▶️  Starting training for Skip-Connection CNN model..."
+python main.py --model skipcon_cnn --config skipcon.yaml
 
-python main.py --model skipcon --config skipcon.yaml
+echo "▶️  Starting training for Inception CNN model..."
+python main.py --model inception_cnn --config inception.yaml
 
-echo "All models finished!"
+echo "✅  All models finished!"

@@ -1,16 +1,16 @@
 data:
   image_size: 256
-  clahe: true
+  clahe: false
   augment: false
   batch_size: 16
 
 model:
-  skipcon_stem_filters: 32
-  skipcon_block_filters: [32, 64, 128]
-  skipcon_blocks_per_stage: [2, 2, 2]
+  stem_filters: 32
+  block_filters: [32, 64, 128]
+  blocks_per_stage: [2, 2, 2]
   dense_units: 128
   dropout_rate: 0.2
-  use_gender: true
+  use_gender: false
 
 training:
   epochs: 70

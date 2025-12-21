@@ -32,9 +32,9 @@ class DataConfig:
 class ModelConfig:
    channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    dense_units: int = 128
-   skipcon_stem_filters: int = 32            # Stem filters for ResNet-style model
-   skipcon_block_filters: list[int] = field(default_factory=lambda: [32, 64, 128, 256])
-   skipcon_blocks_per_stage: list[int] = field(default_factory=lambda: [2, 2, 2, 2])
+   stem_filters: int = 32            # Stem filters for ResNet-style model
+   block_filters: list[int] = field(default_factory=lambda: [32, 64, 128, 256])
+   blocks_per_stage: list[int] = field(default_factory=lambda: [2, 2, 2, 2])
    inception_base_filters: int = 32         # Base filter multiplier for Inception-style model
    inception_a_blocks: int = 2              # Number of Inception-A blocks
    inception_b_blocks: int = 3              # Number of Inception-B blocks

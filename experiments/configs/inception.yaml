@@ -1,6 +1,6 @@
 data:
   image_size: 256
-  clahe: true
+  clahe: false
   augment: false
   batch_size: 16
 
@@ -11,7 +11,7 @@ model:
   inception_c_blocks: 1
   dense_units: 128
   dropout_rate: 0.2
-  use_gender: true
+  use_gender: false
 
 training:
   epochs: 70

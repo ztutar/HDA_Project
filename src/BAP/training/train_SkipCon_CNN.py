@@ -112,9 +112,9 @@ def train_SkipConCNN(
    input_shape = (image_size, image_size, 1)
    model = build_SkipConCNN(
       input_shape=input_shape,
-      stem_filters=model_cfg.skipcon_stem_filters,
-      block_filters=model_cfg.skipcon_block_filters,
-      blocks_per_stage=model_cfg.skipcon_blocks_per_stage,
+      stem_filters=model_cfg.stem_filters,
+      block_filters=model_cfg.block_filters,
+      blocks_per_stage=model_cfg.blocks_per_stage,
       dense_units=model_cfg.dense_units,
       dropout_rate=model_cfg.dropout_rate,
       use_gender=model_cfg.use_gender,
