@@ -2,9 +2,11 @@ from typing import Optional
 import argparse
 import os
 
-from BAP.training.train_GlobalCNN import train_GlobalCNN
+from BAP.training.train_BaseCNN import train_BaseCNN
 from BAP.training.train_ROI_CNN import train_ROI_CNN
 from BAP.training.train_Fusion_CNN import train_FusionCNN
+from BAP.training.train_SkipCon_CNN import train_SkipConCNN
+from BAP.training.train_Inception_CNN import train_InceptionCNN
 
 from BAP.utils.logger import setup_logging
 from BAP.utils.config import load_config
@@ -14,15 +16,19 @@ from BAP.utils.dataset_loader import get_rsna_dataset
 
 # Map user-friendly aliases to canonical model metadata (name, trainer, default config)
 MODEL_REGISTRY = {
-   "globalcnn": ("GlobalCNN", train_GlobalCNN),
-   "global_cnn": ("GlobalCNN", train_GlobalCNN),
-   "global": ("GlobalCNN", train_GlobalCNN),
+   "basecnn": ("BaseCNN", train_BaseCNN),
+   "base_cnn": ("BaseCNN", train_BaseCNN),
+   "base": ("BaseCNN", train_BaseCNN),
    "roi_cnn": ("ROI_CNN", train_ROI_CNN),
    "roicnn": ("ROI_CNN", train_ROI_CNN),
    "roi": ("ROI_CNN", train_ROI_CNN),
    "fusion_cnn": ("Fusion_CNN", train_FusionCNN),
    "fusioncnn": ("Fusion_CNN", train_FusionCNN),
    "fusion": ("Fusion_CNN", train_FusionCNN),
+   "skipcon_cnn": ("SkipCon_CNN", train_SkipConCNN),
+   "skipcon": ("SkipCon_CNN", train_SkipConCNN),
+   "inception_cnn": ("Inception_CNN", train_InceptionCNN),
+   "inception": ("Inception_CNN", train_InceptionCNN),
 }
 
 
@@ -67,7 +73,7 @@ if __name__ == "__main__":
       "--model",
       type=str,
       required=True,
-      help="Name of the model to train (e.g., 'GlobalCNN' or 'ROI_CNN')."
+      help="Name of the model to train (e.g., 'BaseCNN' or 'ROI_CNN')."
    )
    parser.add_argument(
       "--config",

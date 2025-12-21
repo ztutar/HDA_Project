@@ -1,0 +1,21 @@
+data:
+  image_size: 256
+  clahe: true
+  augment: false
+  batch_size: 16
+
+model:
+  inception_base_filters: 32
+  inception_a_blocks: 2
+  inception_b_blocks: 3
+  inception_c_blocks: 1
+  dense_units: 128
+  dropout_rate: 0.2
+  use_gender: true
+
+training:
+  epochs: 70
+  patience: 10
+  learning_rate: 0.001
+  results_csv: "experiments/train_results_summary.csv"
+  perform_test: true

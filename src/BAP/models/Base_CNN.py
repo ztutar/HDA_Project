@@ -1,7 +1,7 @@
 
-"""Global convolutional neural network used for bone age regression.
+"""Base convolutional neural network used for bone age regression.
 
-This module defines a single factory function, `build_GlobalCNN`, that assembles
+This module defines a single factory function, `build_BaseCNN`, that assembles
 the end-to-end Keras model. The network stacks multiple convolutional blocks
 with BatchNorm and ReLU activations, downsamples via max pooling, aggregates
 features with global average pooling, and projects them through a dense head for
@@ -19,14 +19,14 @@ from keras import layers, Model
 
 #logger = get_logger(__name__)
 
-def build_GlobalCNN(
+def build_BaseCNN(
    input_shape: Tuple[int, int, int] = (512, 512, 1),
    channels: Sequence[int] = (32, 64, 128),
    dense_units: int = 64,
    dropout_rate: float = 0.2,
    use_gender: bool = False
 ) -> Model:
-   """Construct the Global CNN with optional gender metadata.
+   """Construct the Base CNN with optional gender metadata.
 
    The network is organized as a stack of convolutional blocks that each apply
    two `Conv2D → BatchNorm → ReLU` sequences followed by max pooling, producing
@@ -88,12 +88,12 @@ def build_GlobalCNN(
       gender_embed = layers.Flatten(name="gender_embed_flat")(gender_embed) # [B,8]
       x = layers.Concatenate(name="features_with_gender")([x, gender_embed]) # [B,ch+8]
       inputs = [input_image, input_gender]
-      name = "Global_CNN_with_gender"
-      #logger.info("Building GlobalCNN model with gender input.")
+      name = "Base_CNN_with_gender"
+      #logger.info("Building BaseCNN model with gender input.")
    else:
       inputs = [input_image]
-      name = "Global_CNN"
-      #logger.info("Building GlobalCNN model w/o gender input.")
+      name = "Base_CNN"
+      #logger.info("Building BaseCNN model w/o gender input.")
    
    if dropout_rate > 0:
       x = layers.Dropout(rate=dropout_rate, name="dropout")(x) # [B,ch(+8)]

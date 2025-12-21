@@ -1,0 +1,18 @@
+data:
+  image_size: 256
+  clahe: true
+  augment: false
+  batch_size: 16
+
+model:
+  channels: [32, 64, 128]
+  dense_units: 64
+  dropout_rate: 0.2
+  use_gender: true
+
+training:
+  epochs: 70
+  patience: 10
+  learning_rate: 0.001
+  results_csv: "experiments/train_results_summary.csv"
+  perform_test: true

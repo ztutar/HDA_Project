@@ -1,10 +1,10 @@
 # Bone Age Prediction - HDA Project
 
-Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. The scope is to predict bone age from hand X-rays with minimal error while experimenting with alternative preprocessing pipelines (CLAHE, augmentation) and model designs (Global, ROI, Fusion; with/without gender) to understand which combinations generalise best.
+Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. The scope is to predict bone age from hand X-rays with minimal error while experimenting with alternative preprocessing pipelines (CLAHE, augmentation) and model designs (Base, ROI, Fusion; with/without gender) to understand which combinations generalise best.
 
 ## Highlights
 
-- **Multiple model families**: `GlobalCNN`, `ROI_CNN`, and `Fusion_CNN` trainers share utilities but can be run independently.
+- **Multiple model families**: `BaseCNN`, `ROI_CNN`, and `Fusion_CNN` trainers share utilities but can be run independently.
 - **Automatic ROI pipeline**: carpal/metacarpus & phalanx crops are created with the locator in `src/BAP/roi` and cached under `data/cropped_rois`.
 - **Config-driven experiments**: YAML files in `experiments/configs` describe data, model, ROI, and training settings.
 - **Experiment tracking**: checkpoints land in `experiments/checkpoints`, summaries append to `experiments/train_results_summary.csv`, and curated exports live in `model_checkpoint/`.
@@ -19,11 +19,11 @@ HDA_Project/
 │   ├── cropped_rois/           # Auto-generated ROI crops + heatmaps
 │   └── metadata/               # CSV splits consumed by the tf.data pipelines
 ├── experiments/
-│   ├── configs/                # global_only.yaml, roi_only.yaml, fusion.yaml, …
+│   ├── configs/                # base.yaml, roi_only.yaml, fusion.yaml, …
 │   ├── checkpoints/            # stores .keras weights, TB logs, and .log files
 │   └── train_results_summary.csv
 ├── src/BAP/
-│   ├── models/                 # Fusion_CNN.py, Global_CNN.py, ROI_CNN.py
+│   ├── models/                 # Fusion_CNN.py, Base_CNN.py, ROI_CNN.py
 │   ├── roi/                    # ROI locator/extractor built on Grad-CAM peaks
 │   ├── training/               # Trainer scripts, callbacks, summaries
 │   ├── utils/                  # Config loader, dataset utilities, seed & path helpers
@@ -80,16 +80,16 @@ python main.py --model fusion --config fusion.yaml
 
 | `--model` flag | Trainer (file)                 | Description                                                 | Default config |
 |----------------|--------------------------------|-------------------------------------------------------------|----------------|
-| `global`, `global_cnn` | `BAP.training.train_GlobalCNN` | CNN on full-resolution hands; CLAHE/augmentation + optional gender input. | `experiments/configs/global_only.yaml` |
+| `Base`, `base_cnn` | `BAP.training.train_BaseCNN` | CNN on full-resolution hands; CLAHE/augmentation + optional gender input. | `experiments/configs/base.yaml` |
 | `roi`, `roi_cnn`       | `BAP.training.train_ROI_CNN`   | Two-branch regressor on carpal & metacarpus/phalanx crops; CLAHE/augmentation + optional gender input. | `experiments/configs/roi_only.yaml`    |
-| `fusion`, `fusion_cnn` | `BAP.training.train_Fusion_CNN`| Fuses global stream with ROI embeddings; CLAHE/augmentation + optional gender input.| `experiments/configs/fusion.yaml`      |
+| `fusion`, `fusion_cnn` | `BAP.training.train_Fusion_CNN`| Fuses base stream with ROI embeddings; CLAHE/augmentation + optional gender input.| `experiments/configs/fusion.yaml`      |
 
 If `--config` is omitted, defaults defined in `BAP.utils.config` are used. Each run saves under `experiments/checkpoints/<Model>/<config_name>_<run_id>/` where callbacks store the best `.keras` weights, TensorBoard logs, copied config, and history CSVs.
 
 ### ROI lifecycle
 
 - The ROI & Fusion trainers look under `data/cropped_rois/<split>/{carpal,metaph,heatmaps}`.
-- Missing crops trigger `BAP.roi.ROI_locator.train_locator_and_save_rois`, which leverages Grad-CAM peaks from a pretrained `GlobalCNN` checkpoint (`roi.locator.pretrained_model_path`) to cut and persist crops.
+- Missing crops trigger `BAP.roi.ROI_locator.train_locator_and_save_rois`, which leverages Grad-CAM peaks from a pretrained `BaseCNN` checkpoint (`roi.locator.pretrained_model_path`) to cut and persist crops.
 - Once created, crops are reused, which keeps subsequent experiments fast.
 
 ## Experiments & outputs
@@ -112,14 +112,14 @@ data:
 roi:
   locator:
     roi_path: "data/cropped_rois"
-    pretrained_model_path: "model_checkpoint/GlobalCNN_best.keras"
+    pretrained_model_path: "model_checkpoint/BaseCNN_best.keras"
   extractor:
     roi_size: 128
     heatmap_threshold: 0.25
     save_heatmaps: true
 
 model:
-  global_channels: [32, 64, 128]
+  channels: [32, 64, 128]
   roi_channels: [32, 64]
   fusion_dense_units: [256, 128]
   dropout_rate: 0.2

@@ -2,7 +2,7 @@
 Fusion CNN training pipeline utilities.
 
 This module orchestrates the full end-to-end workflow required to train the
-fusion model that combines global full-hand radiographs with region-of-interest
+fusion model that combines full-hand radiographs with region-of-interest
 carpal/metaph crops and tabular metadata. It provides:
 
 - Automated ROI generation by invoking the locator network when cached crops
@@ -19,7 +19,7 @@ carpal/metaph crops and tabular metadata. It provides:
    when multiple training runs are executed sequentially.
 """
 
-from typing import Tuple, Sequence
+from typing import Tuple
 import os
 import gc
 import io
@@ -40,7 +40,6 @@ from BAP.utils.path_manager import save_model_dicts
 from BAP.roi.ROI_locator import train_locator_and_save_rois
 
 from BAP.models.Fusion_CNN import build_FusionCNN
-from BAP.models.Global_CNN import build_GlobalCNN
 
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
@@ -53,7 +52,7 @@ def train_FusionCNN(
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
    """
-   Train the Fusion CNN model that fuses global images, ROI crops, and metadata.
+   Train the Fusion CNN model that fuses base images, ROI crops, and metadata.
 
    Step-by-step overview:
 
@@ -209,86 +208,31 @@ def train_FusionCNN(
 
    # Deduce input shapes from one batch
    sample_inputs, _ = next(iter(train_ds.take(1)))
-   global_input_shape = tuple(sample_inputs["image"].shape[1:])
+   input_shape = tuple(sample_inputs["image"].shape[1:])
    roi_shape = tuple(sample_inputs["carpal"].shape[1:])
 
    # -----------------------
    # Model
    # -----------------------
-   global_channels = model_cfg.global_channels
-   global_dense_units = model_cfg.global_dense_units
+   channels = model_cfg.channels
+   dense_units = model_cfg.dense_units
    roi_channels = model_cfg.roi_channels
    roi_dense_units = model_cfg.roi_dense_units
    fusion_dense_units = model_cfg.fusion_dense_units
    dropout_rate = model_cfg.dropout_rate
    use_gender = model_cfg.use_gender
 
-
-   def init_fusion_from_global(
-      fusion_model: keras.Model,
-      ckpt_path: str,
-      input_shape: Tuple,
-      channels: Sequence[int],
-      dense_units: int,
-      use_gender: bool,
-   ) -> keras.Model:
-      """Load a Global CNN checkpoint and copy weights into fusion global branch."""
-      global_model = build_GlobalCNN(
-         input_shape=input_shape,
-         channels=channels,
-         dense_units=dense_units,
-         dropout_rate=0,  # ignore dropout weights
-         use_gender=use_gender,
-      )
-      global_model.load_weights(ckpt_path)
-
-      name_map = {
-         "global_block1_conv1": "conv_block_1_conv1",
-         "global_block1_bn1": "conv_block_1_bn1",
-         "global_block1_conv2": "conv_block_1_conv2",
-         "global_block1_bn2": "conv_block_1_bn2",
-         "global_block2_conv1": "conv_block_2_conv1",
-         "global_block2_bn1": "conv_block_2_bn1",
-         "global_block2_conv2": "conv_block_2_conv2",
-         "global_block2_bn2": "conv_block_2_bn2",
-         "global_block3_conv1": "conv_block_3_conv1",
-         "global_block3_bn1": "conv_block_3_bn1",
-         "global_block3_conv2": "conv_block_3_conv2",
-         "global_block3_bn2": "conv_block_3_bn2",
-         "global_dense": "dense",  # final projection
-      }
-      for target, source in name_map.items():
-         fusion_model.get_layer(target).set_weights(
-            global_model.get_layer(source).get_weights()
-         )
-
    model = build_FusionCNN(
-      global_input_shape=global_input_shape,
+      input_shape=input_shape,
       roi_shape=roi_shape,
-      global_channels=global_channels,
+      channels=channels,
       roi_channels=roi_channels,
-      global_dense_units=global_dense_units,
+      dense_units=dense_units,
       roi_dense_units=roi_dense_units,
       fusion_dense_units=fusion_dense_units,
       dropout_rate=dropout_rate,
       use_gender=use_gender,
    )
-   
-   # Optional initialization from pretrained Global CNN
-   ckpt_path = model_cfg.pretrained_backbone
-   if ckpt_path:
-      init_fusion_from_global(
-         fusion_model=model,
-         ckpt_path=ckpt_path,
-         input_shape=global_input_shape,
-         channels=global_channels,
-         dense_units=global_dense_units,
-         use_gender=use_gender,
-      )
-      logger.info(
-         "Initialized FusionCNN global branch from pretrained GlobalCNN at %s",
-         ckpt_path,
-      )
 
    # -----------------------
    # Optimizer (Adam, fixed LR)

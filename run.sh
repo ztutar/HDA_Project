@@ -1,10 +1,10 @@
 
 pip install -e .
 
-echo "Running FUSION model..."
-python main.py --model fusion_cnn --config fusion.yaml
+python main.py --model inception --config inception.yaml
 
-echo "Running FUSION model with Gender..."
-python main.py --model fusion_cnn --config fusion_gender.yaml
+python main.py --model densenet --config densenet.yaml
+
+python main.py --model skipcon --config skipcon.yaml
 
 echo "All models finished!"

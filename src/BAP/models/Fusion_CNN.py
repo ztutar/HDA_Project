@@ -1,5 +1,5 @@
 """
-Fusion CNN module that combines a global full-hand branch with ROI-specific CNN
+Fusion CNN module that combines a base full-hand branch with ROI-specific CNN
 heads to predict skeletal age. The module exposes two public helpers:
 
 - ``build_FusionCNN`` builds a multi-input Keras model that ingests a full-hand
@@ -10,7 +10,7 @@ heads to predict skeletal age. The module exposes two public helpers:
    dropout rates, fusion stack sizes, and the gender embedding) are surfaced so
    callers can tailor the network architecture without touching the internals.
 
-- ``_global_branch`` defines the convolutional feature extractor used for the
+- ``base_branch`` defines the convolutional feature extractor used for the
    full-hand image. It stacks configurable Conv-BN-ReLU blocks with max pooling
    for progressive downsampling, then applies global average pooling and a dense
    layer to deliver a compact descriptor that feeds into the fusion stage. While
@@ -29,11 +29,11 @@ from BAP.models.ROI_CNN import ROI_CNN_head
 #logger = get_logger(__name__)
 
 def build_FusionCNN(
-   global_input_shape: Tuple[int, int, int] = (512, 512, 1),
+   input_shape: Tuple[int, int, int] = (512, 512, 1),
    roi_shape: Tuple[int, int, int] = (224, 224, 1),
-   global_channels: Sequence[int] = (32, 64, 128),
+   channels: Sequence[int] = (32, 64, 128),
    roi_channels: Sequence[int] = (32, 64),
-   global_dense_units: int = 128,
+   dense_units: int = 128,
    roi_dense_units: int = 32,
    fusion_dense_units: Sequence[int] = (256, 128),
    dropout_rate: float = 0.2,
@@ -47,12 +47,12 @@ def build_FusionCNN(
    touching the model internals.
    
    Args:
-      global_input_shape: Tensor shape of the whole-hand image fed into the
-         global branch.
+      input_shape: Tensor shape of the whole-hand image fed into the
+         base branch.
       roi_shape: Input shape shared by the carpal and metacarpal ROI crops.
-      global_channels: Per-block filter counts for the global feature extractor.
+      base_channels: Per-block filter counts for the base feature extractor.
       roi_channels: Channel configuration passed to each ROI head.
-      global_dense_units: Size of the dense projection after the global branch.
+      base_dense_units: Size of the dense projection after the base branch.
       roi_dense_units: Size of the dense layer inside each ROI head.
       fusion_dense_units: Sequence of dense layer widths applied after feature
          concatenation.
@@ -63,8 +63,8 @@ def build_FusionCNN(
    Returns:
       Compiled Keras `Model` ready to train for bone-age regression.
    """
-   image_input = layers.Input(shape=global_input_shape, dtype=tf.float32, name="image") # [B,H,W,1]
-   global_features = _global_branch(image_input, global_channels, global_dense_units) # [B,global_dense_units]
+   image_input = layers.Input(shape=input_shape, dtype=tf.float32, name="image") # [B,H,W,1]
+   base_features = base_branch(image_input, channels, dense_units) # [B,dense_units]
 
    carpal_input = layers.Input(shape=roi_shape, dtype=tf.float32, name="carpal") # [B,H,W,1]
    metaph_input = layers.Input(shape=roi_shape, dtype=tf.float32, name="metaph") # [B,H,W,1]
@@ -73,13 +73,13 @@ def build_FusionCNN(
    carpal_features = layers.Dense(int(roi_dense_units/2), activation="relu", name="carpal_dense")(carpal_features) # [B,roi_dense_units/2]
    metaph_features = layers.Dense(int(roi_dense_units/2), activation="relu", name="metaph_dense")(metaph_features) # [B,roi_dense_units/2]
 
-   fused = layers.Concatenate(name="fusion_concat")([global_features, carpal_features, metaph_features]) # [B, global_dense_units + roi_dense_units*2]
+   fused = layers.Concatenate(name="fusion_concat")([base_features, carpal_features, metaph_features]) # [B, dense_units + roi_dense_units*2]
 
    if use_gender:
       gender_input = layers.Input(shape=(), dtype=tf.int32, name="gender") # [B,]
       gender_embedding = layers.Embedding(input_dim=2, output_dim=8, name="gender_embed")(gender_input) # [B,8]
       gender_embedding = layers.Flatten(name="gender_embed_flat")(gender_embedding) # [B,8]
-      fused = layers.Concatenate(name="fusion_concat_with_gender")([fused, gender_embedding]) # [B, global_dense_units + roi_dense_units*2 + 8]
+      fused = layers.Concatenate(name="fusion_concat_with_gender")([fused, gender_embedding]) # [B, dense_units + roi_dense_units*2 + 8]
       inputs = [image_input, carpal_input, metaph_input, gender_input]
       name = "Fusion_CNN_with_gender"
       #logger.info("Building Fusion CNN model with gender input.")
@@ -102,7 +102,7 @@ def build_FusionCNN(
    return model
 
 
-def _global_branch(
+def base_branch(
 
    x: tf.Tensor,
    channels: Sequence[int],
@@ -112,7 +112,7 @@ def _global_branch(
    Build the convolutional backbone that processes the full-hand radiograph.
 
    Args:
-      x: Keras tensor for the global image input.
+      x: Keras tensor for the image input.
       channels: Filter counts for each Conv-BN-ReLU block; a max-pooling layer
          follows every block to halve the spatial resolution while increasing
          representational capacity.
@@ -120,7 +120,7 @@ def _global_branch(
          pooling to produce the feature vector that feeds the fusion head.
 
    Returns:
-      Tensor representing the per-image descriptor emitted by the global branch.
+      Tensor representing the per-image descriptor emitted by the base branch.
    """
    for idx, ch in enumerate(channels):
       x = layers.Conv2D(
@@ -129,23 +129,23 @@ def _global_branch(
          strides=1, 
          padding="same", 
          use_bias=False, 
-         name=f"global_block{idx + 1}_conv1"
+         name=f"base_block{idx + 1}_conv1"
       )(x) # [B,H,W,ch]
-      x = layers.BatchNormalization(name=f"global_block{idx + 1}_bn1")(x) # [B,H,W,ch]
-      x = layers.ReLU(name=f"global_block{idx + 1}_relu1")(x) # [B,H,W,ch]
+      x = layers.BatchNormalization(name=f"base_block{idx + 1}_bn1")(x) # [B,H,W,ch]
+      x = layers.ReLU(name=f"base_block{idx + 1}_relu1")(x) # [B,H,W,ch]
 
       x = layers.Conv2D(
          filters=ch, 
          kernel_size=3, 
          padding="same", 
          use_bias=False, 
-         name=f"global_block{idx + 1}_conv2"
+         name=f"base_block{idx + 1}_conv2"
       )(x) # [B,H,W,ch]
-      x = layers.BatchNormalization(name=f"global_block{idx + 1}_bn2")(x) # [B,H,W,ch]
-      x = layers.ReLU(name=f"global_block{idx + 1}_relu2")(x) # [B,H,W,ch]
+      x = layers.BatchNormalization(name=f"base_block{idx + 1}_bn2")(x) # [B,H,W,ch]
+      x = layers.ReLU(name=f"base_block{idx + 1}_relu2")(x) # [B,H,W,ch]
 
-      x = layers.MaxPooling2D(pool_size=2, padding="same", name=f"global_block{idx + 1}_pool")(x) # [B,H/2,W/2,ch]
+      x = layers.MaxPooling2D(pool_size=2, padding="same", name=f"base_block{idx + 1}_pool")(x) # [B,H/2,W/2,ch]
 
    x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x) # [B,ch]
-   x = layers.Dense(dense_units, activation="relu", name="global_dense")(x) # [B,dense_units]
+   x = layers.Dense(dense_units, activation="relu", name="base_dense")(x) # [B,dense_units]
    return x

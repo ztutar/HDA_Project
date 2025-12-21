@@ -1,13 +1,13 @@
 """
-Training entry point for the GlobalCNN model.
+Training entry point for the BaseCNN model.
 
-This module orchestrates the full lifecycle of a Global convolutional neural
+This module orchestrates the full lifecycle of a Base convolutional neural
 network used for bone-age prediction. It prepares tf.data pipelines for the
-train/validation/test splits, builds the GlobalCNN architecture via
-`build_GlobalCNN`, compiles it with mixed precision, and attaches callbacks
+train/validation/test splits, builds the BaseCNN architecture via
+`build_BaseCNN`, compiles it with mixed precision, and attaches callbacks
 defined in `BAP.training.callbacks`. After training, it optionally evaluates on
 the test split, logs a detailed summary, and appends a CSV summary . The module 
-exposes a single public function, `train_GlobalCNN`, which encapsulates these 
+exposes a single public function, `train_BaseCNN`, which encapsulates these 
 responsibilities and returns the trained Keras model together with its History object.
 """
 
@@ -28,20 +28,20 @@ from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_dataset
 from BAP.utils.path_manager import save_model_dicts
 
-from BAP.models.Global_CNN import build_GlobalCNN
+from BAP.models.Base_CNN import build_BaseCNN
 
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
 
 logger = get_logger(__name__)
 
-def train_GlobalCNN(
+def train_BaseCNN(
    paths: dict,
    config_bundle: ProjectConfig, 
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
    """
-   Train, evaluate, and persist a GlobalCNN instance.
+   Train, evaluate, and persist a BaseCNN instance.
 
    Parameters
    ----------
@@ -67,7 +67,7 @@ def train_GlobalCNN(
    1. Mirror stdout to file for reproducible logs and enforce mixed precision.
    2. Build train/val tf.data pipelines with metadata-driven labels, optional
       augmentation, and prefetching for throughput.
-   3. Instantiate GlobalCNN via `build_GlobalCNN` with config-driven topology.
+   3. Instantiate BaseCNN via `build_BaseCNN` with config-driven topology.
    4. Compile with an Adam optimizer (wrapped in loss scaling), Huber loss, and
       MAE/RMSE metrics.
    5. Set up callbacks (checkpoints, early stopping, LR scheduling) and launch
@@ -82,7 +82,7 @@ def train_GlobalCNN(
    # -----------------------
    # Config & reproducibility
    # -----------------------
-   model_name = "GlobalCNN"
+   model_name = "BaseCNN"
    data_cfg = config_bundle.data
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
@@ -150,13 +150,13 @@ def train_GlobalCNN(
    # -----------------------
    # Model
    # -----------------------
-   channels = model_cfg.global_channels
-   dense_units = model_cfg.global_dense_units
+   channels = model_cfg.channels
+   dense_units = model_cfg.dense_units
    dropout_rate = model_cfg.dropout_rate
    use_gender = model_cfg.use_gender
    input_shape = (image_size, image_size, 1)  # grayscale input
    
-   model = build_GlobalCNN(
+   model = build_BaseCNN(
       input_shape=input_shape,
       channels=channels,
       dense_units=dense_units,
@@ -214,7 +214,7 @@ def train_GlobalCNN(
    # Train
    # -----------------------
    epochs = training_cfg.epochs
-   logger.info("Starting GlobalCNN training for %d epochs", epochs)
+   logger.info("Starting BaseCNN training for %d epochs", epochs)
    start_train = time.time()
    history = model.fit(
       train_ds,
@@ -330,13 +330,13 @@ def train_GlobalCNN(
    # -----------------------
    # Save model results & metrics
    # -----------------------
-   model_results_dict["GlobalCNN"] = {
+   model_results_dict["BaseCNN"] = {
       "num_params": num_params,
       "training_time": training_time,
       "num_epochs_ran": num_epochs_ran,
       "best_epoch_idx": best_epoch_idx
    }
-   model_metrics_dict["GlobalCNN"] = {
+   model_metrics_dict["BaseCNN"] = {
       "history": history.history,
       "train_loss": history.history["loss"][best_epoch_idx],
       "train_mae": history.history["mae"][best_epoch_idx],
@@ -346,7 +346,7 @@ def train_GlobalCNN(
       "val_rmse": history.history["val_rmse"][best_epoch_idx],
    }
    if perform_test:
-      model_metrics_dict["GlobalCNN"].update({
+      model_metrics_dict["BaseCNN"].update({
          "test_loss": test_loss,
          "test_mae": test_mae,
          "test_rmse": test_rmse

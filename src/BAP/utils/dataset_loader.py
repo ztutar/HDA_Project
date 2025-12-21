@@ -174,13 +174,13 @@ def make_fusion_dataset(
       image_dir: Directory containing the original radiographs.
       roi_dir: Mapping with ``"carpal"`` and ``"metaph"`` ROI directories.
       metadata: DataFrame with target ages and gender information.
-      image_size: Output resolution for the global radiograph.
-      clahe: Whether to run CLAHE on the global image branch.
+      image_size: Output resolution for the radiograph.
+      clahe: Whether to run CLAHE on the base image branch.
       augment: Whether to apply geometric and photometric augmentation.
 
    Returns:
       A dataset where each ``features`` dictionary exposes four entries:
-      ``image`` (global), ``carpal``, ``metaph``, and ``gender``.
+      ``image`` (base), ``carpal``, ``metaph``, and ``gender``.
    """
    
    image_ids = metadata["Image ID"].astype(str).tolist()

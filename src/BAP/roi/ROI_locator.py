@@ -102,7 +102,7 @@ def train_locator_and_save_rois(
 
    roi_loc_model = keras.models.load_model(pretrained_model_path, compile=False)
    #logger.info(
-   #   "Loaded pretrained GlobalCNN model for ROI locator from %s (config='%s', split=%s).",
+   #   "Loaded pretrained BaseCNN model for ROI locator from %s (config='%s', split=%s).",
    #   pretrained_model_path,
    #   raw_model_path,
    #   split,

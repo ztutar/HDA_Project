@@ -1,5 +1,5 @@
 {
-  "GlobalCNN": {
+  "BaseCNN": {
     "history": {
       "loss": [
         261.3856506347656,
@@ -327,7 +327,7 @@
     "test_mae": 13.450353622436523,
     "test_rmse": 18.654476165771484
   },
-  "GlobalCNN_Gender":{
+  "BaseCNN_Gender":{
     "history": {
       "loss": [
         262.64910888671875,
