@@ -1,14 +1,14 @@
 data:
   image_size: 256
   clahe: false
-  augment: false
+  augment: true
   batch_size: 16
 
 model:
   channels: [32, 64, 128]
   dense_units: 128
   dropout_rate: 0.2
-  use_gender: false
+  use_gender: true
 
 training:
   epochs: 70
