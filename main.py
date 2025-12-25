@@ -3,8 +3,6 @@ import argparse
 import os
 
 from BAP.training.train_BaseCNN import train_BaseCNN
-from BAP.training.train_ROI_CNN import train_ROI_CNN
-from BAP.training.train_Fusion_CNN import train_FusionCNN
 from BAP.training.train_SkipCon_CNN import train_SkipConCNN
 from BAP.training.train_Inception_CNN import train_InceptionCNN
 
@@ -19,12 +17,6 @@ MODEL_REGISTRY = {
    "basecnn": ("BaseCNN", train_BaseCNN),
    "base_cnn": ("BaseCNN", train_BaseCNN),
    "base": ("BaseCNN", train_BaseCNN),
-   "roi_cnn": ("ROI_CNN", train_ROI_CNN),
-   "roicnn": ("ROI_CNN", train_ROI_CNN),
-   "roi": ("ROI_CNN", train_ROI_CNN),
-   "fusion_cnn": ("Fusion_CNN", train_FusionCNN),
-   "fusioncnn": ("Fusion_CNN", train_FusionCNN),
-   "fusion": ("Fusion_CNN", train_FusionCNN),
    "skipcon_cnn": ("SkipCon_CNN", train_SkipConCNN),
    "skipcon": ("SkipCon_CNN", train_SkipConCNN),
    "inception_cnn": ("Inception_CNN", train_InceptionCNN),
@@ -73,7 +65,7 @@ if __name__ == "__main__":
       "--model",
       type=str,
       required=True,
-      help="Name of the model to train (e.g., 'BaseCNN' or 'ROI_CNN')."
+      help="Name of the model to train (e.g., 'BaseCNN' or 'Inception_CNN')."
    )
    parser.add_argument(
       "--config",

@@ -18,7 +18,6 @@ from BAP.utils.config import (
    DataConfig,
    ModelConfig,
    ProjectConfig,
-   ROIConfig,
    TrainingConfig,
 )
 
@@ -97,7 +96,6 @@ def _get_default_config_keys() -> List[str]:
    if _DEFAULT_CONFIG_KEYS is None:
       defaults = ProjectConfig(
          data=DataConfig(),
-         roi=ROIConfig(),
          model=ModelConfig(),
          training=TrainingConfig(),
          raw={},

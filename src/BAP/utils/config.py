@@ -1,6 +1,6 @@
 """Utilities for loading and validating experiment configuration files.
 
-The module defines dataclasses that hold defaults for data, ROI processing,
+The module defines dataclasses that hold defaults for data, pre-processing,
 model, and training parameters. The `load_config` entrypoint reads a YAML file,
 merges it with the defaults, coerces values to the expected types, and returns a
 `ProjectConfig` object that keeps both the structured view and the original raw
@@ -32,16 +32,13 @@ class DataConfig:
 class ModelConfig:
    channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    dense_units: int = 128
-   stem_filters: int = 32            # Stem filters for ResNet-style model
+   stem_filters: int = 32                    # Stem filters for ResNet-style model
    block_filters: list[int] = field(default_factory=lambda: [32, 64, 128, 256])
    blocks_per_stage: list[int] = field(default_factory=lambda: [2, 2, 2, 2])
    inception_base_filters: int = 32         # Base filter multiplier for Inception-style model
    inception_a_blocks: int = 2              # Number of Inception-A blocks
    inception_b_blocks: int = 3              # Number of Inception-B blocks
    inception_c_blocks: int = 1              # Number of Inception-C blocks
-   roi_channels: list[int] = field(default_factory=lambda: [32, 64])
-   roi_dense_units: int = 32
-   fusion_dense_units: list[int] = field(default_factory=lambda: [256, 128])
    use_gender: bool = False
    dropout_rate: float = 0.2
 
@@ -54,25 +51,8 @@ class TrainingConfig:
    perform_test: bool = False
 
 @dataclass
-class ROILocatorConfig:
-   roi_path: str = "data/cropped_rois"
-   pretrained_model_path: str = ""
-
-@dataclass
-class ROIExtractorConfig:
-   roi_size: int = 256
-   heatmap_threshold: float = 0.4
-   save_heatmaps: bool = False
-
-@dataclass
-class ROIConfig:
-   locator: ROILocatorConfig = field(default_factory=ROILocatorConfig)
-   extractor: ROIExtractorConfig = field(default_factory=ROIExtractorConfig)
-
-@dataclass
 class ProjectConfig:
    data: DataConfig = field(default_factory=DataConfig)
-   roi: ROIConfig = field(default_factory=ROIConfig)
    model: ModelConfig = field(default_factory=ModelConfig)
    training: TrainingConfig = field(default_factory=TrainingConfig)
    config_name: str = "default"
@@ -105,7 +85,6 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
       #logger.info("No config path provided; using defaults.")
       return ProjectConfig(
          data=DataConfig(),
-         roi=ROIConfig(),
          model=ModelConfig(),
          training=TrainingConfig(),
          config_name="default",
@@ -135,18 +114,6 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
    data_section = _filter_known_fields(data_section, DataConfig)
    data_config = DataConfig(**data_section)
    
-   # ROI Section
-   roi_section = config_dict.get("roi", {})
-   roi_locator_section = roi_section.get("locator", {})
-   roi_locator_section = _filter_known_fields(roi_locator_section, ROILocatorConfig)
-   roi_locator_config = ROILocatorConfig(**roi_locator_section)
-   
-   roi_extractor_section = roi_section.get("extractor", {})
-   roi_extractor_section = _filter_known_fields(roi_extractor_section, ROIExtractorConfig)
-   roi_extractor_config = ROIExtractorConfig(**roi_extractor_section)
-   
-   roi_config = ROIConfig(locator=roi_locator_config, extractor=roi_extractor_config)
-   
    # Model Section
    model_section = config_dict.get("model", {})
    model_section = _filter_known_fields(model_section, ModelConfig)
@@ -162,7 +129,6 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
 
    return ProjectConfig(
       data=data_config,
-      roi=roi_config,
       model=model_config,
       training=training_config,
       config_name=str(path_obj),
