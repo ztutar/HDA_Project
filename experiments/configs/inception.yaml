@@ -5,10 +5,10 @@ data:
   batch_size: 16
 
 model:
-  inception_base_filters: 32
-  inception_a_blocks: 2
-  inception_b_blocks: 3
-  inception_c_blocks: 1
+  base_filters: 32
+  num_a_blocks: 2
+  num_b_blocks: 3
+  num_c_blocks: 1
   dense_units: 128
   dropout_rate: 0.2
   use_gender: true

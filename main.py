@@ -5,6 +5,7 @@ import os
 from BAP.training.train_BaseCNN import train_BaseCNN
 from BAP.training.train_SkipCon_CNN import train_SkipConCNN
 from BAP.training.train_Inception_CNN import train_InceptionCNN
+from BAP.training.train_InSkipCon_CNN import train_InSkipConCNN
 
 from BAP.utils.logger import setup_logging
 from BAP.utils.config import load_config
@@ -21,8 +22,9 @@ MODEL_REGISTRY = {
    "skipcon": ("SkipCon_CNN", train_SkipConCNN),
    "inception_cnn": ("Inception_CNN", train_InceptionCNN),
    "inception": ("Inception_CNN", train_InceptionCNN),
+   "inskipcon": ("InSkipCon_CNN", train_InSkipConCNN),
+   "inskipcon_cnn": ("InSkipCon_CNN", train_InSkipConCNN),
 }
-
 
 def main(model_name: str, config_path: Optional[str]) -> None:
 

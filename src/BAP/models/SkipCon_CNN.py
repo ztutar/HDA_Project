@@ -8,7 +8,7 @@ from keras import Model, layers
 
 def build_SkipConCNN(
    input_shape: Tuple[int, int, int] = (512, 512, 1),
-   stem_filters: int = 32,
+   base_filters: int = 32,
    block_filters: Sequence[int] = (32, 64, 128, 256),
    blocks_per_stage: Sequence[int] = (2, 2, 2, 2),
    dense_units: int = 128,
@@ -20,7 +20,7 @@ def build_SkipConCNN(
 
    # Stem
    x = layers.Conv2D(
-      filters=stem_filters,
+      filters=base_filters,
       kernel_size=7,
       strides=2,
       padding="same",

@@ -1,10 +1,10 @@
 # Bone Age Prediction - HDA Project
 
-Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. The scope is to predict bone age from hand X-rays with minimal error while experimenting with CNN variants (Base, SkipCon, Inception) and config-driven training setups.
+Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. The scope is to predict bone age from hand X-rays with minimal error while experimenting with CNN variants (Base, SkipCon, Inception, InSkipCon) and config-driven training setups.
 
 ## Highlights
 
-- **Three model families**: `BaseCNN`, `SkipCon_CNN`, and `Inception_CNN` share tf.data pipelines and callbacks but can be trained independently.
+- **Four model families**: `BaseCNN`, `SkipCon_CNN`, `Inception_CNN`, and `InSkipCon_CNN` (Inception-ResNet-style) share tf.data pipelines and callbacks but can be trained independently.
 - **Config-driven experiments**: YAML files in `experiments/configs` describe data, model, and training settings.
 - **Experiment tracking**: checkpoints land in `experiments/checkpoints`, summaries append to `experiments/train_results_summary.csv`, and curated exports live in `model_checkpoint/`.
 
@@ -21,7 +21,7 @@ HDA_Project/
 │   ├── checkpoints/            # stores .keras weights, TB logs, and .log files
 │   └── train_results_summary.csv
 ├── src/BAP/
-│   ├── models/                 # Base_CNN.py, SkipCon_CNN.py, Inception_CNN.py
+│   ├── models/                 # Base_CNN.py, SkipCon_CNN.py, Inception_CNN.py, InSkipCon_CNN.py
 │   ├── training/               # Trainer scripts, callbacks, summaries
 │   ├── utils/                  # Config loader, dataset utilities, seed & path helpers
 │   └── visualization/          # Visualization utilities
@@ -80,6 +80,7 @@ python main.py --model base --config base.yaml
 | `base`, `base_cnn`     | `BAP.training.train_BaseCNN`       | VGG-style Baseline CNN on hand radiographs; CLAHE/augmentation/gender options.   | `experiments/configs/base.yaml` |
 | `skipcon`, `skipcon_cnn` | `BAP.training.train_SkipCon_CNN`  | ResNet-style blocks with skip connections; CLAHE/augmentation/gender options.      | `experiments/configs/skipcon.yaml` |
 | `inception`, `inception_cnn` | `BAP.training.train_Inception_CNN` | Inception-V4 style stem and multi-branch blocks; CLAHE/augmentation/gender options. | `experiments/configs/inception.yaml` |
+| `inskipcon`, `inskipcon_cnn` | `BAP.training.train_InSkipCon_CNN` | Inception-ResNet-style hybrid with residual scaling (InSkipCon); CLAHE/augmentation/gender options. | `experiments/configs/inskipcon.yaml` |
 
 If `--config` is omitted, defaults defined in `BAP.utils.config` are used. Each run saves under `experiments/checkpoints/<Model>/<config_name>_<run_id>/` where callbacks store the best `.keras` weights, TensorBoard logs, copied config, and history CSVs.
 
@@ -103,13 +104,15 @@ data:
 model:
   channels: [32, 64, 128]        # Used by BaseCNN
   dense_units: 128
-  stem_filters: 32               # Used by SkipCon_CNN
+  base_filters: 32               # Used by SkipCon_CNN, Inception_CNN, InSkipCon_CNN
   block_filters: [32, 64, 128, 256]
   blocks_per_stage: [2, 2, 2, 2]
-  inception_base_filters: 32     # Used by Inception_CNN
-  inception_a_blocks: 2
-  inception_b_blocks: 3
-  inception_c_blocks: 1
+  num_a_blocks: 2
+  num_b_blocks: 3
+  num_c_blocks: 1
+  scale_a: 0.17
+  scale_b: 0.1
+  scale_c: 0.2
   use_gender: false
   dropout_rate: 0.2
 

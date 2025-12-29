@@ -1,9 +1,9 @@
-"""Training entry point for the ResNet-style CNN with residual skips."""
+"""Training entry point for the InSkipCon (Inception-ResNet-style) CNN."""
 
 from typing import Tuple
-import gc
 import io
 import time
+import gc
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_dataset
 from BAP.utils.path_manager import save_model_dicts
 
-from BAP.models.SkipCon_CNN import build_SkipConCNN
+from BAP.models.InSkipCon_CNN import build_InSkipConCNN
 
 from BAP.training.callbacks import make_callbacks
 from BAP.training.summary import append_summary_row
@@ -23,16 +23,16 @@ from BAP.training.summary import append_summary_row
 logger = get_logger(__name__)
 
 
-def train_SkipConCNN(
+def train_InSkipConCNN(
    paths: dict,
    config_bundle: ProjectConfig,
    save_dir: str,
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   """Train, evaluate, and persist a ResNet-style CNN."""
+   """Train, evaluate, and persist the InSkipCon CNN."""
 
    mirror_keras_stdout_to_file()
 
-   model_name = "SkipCon_CNN"
+   model_name = "InSkipCon_CNN"
    data_cfg = config_bundle.data
    model_cfg = config_bundle.model
    training_cfg = config_bundle.training
@@ -110,13 +110,17 @@ def train_SkipConCNN(
    # Model
    # -----------------------
    input_shape = (image_size, image_size, 1)
-   model = build_SkipConCNN(
+   model = build_InSkipConCNN(
       input_shape=input_shape,
       base_filters=model_cfg.base_filters,
-      block_filters=model_cfg.block_filters,
-      blocks_per_stage=model_cfg.blocks_per_stage,
-      dense_units=model_cfg.dense_units,
-      dropout_rate=model_cfg.dropout_rate,
+      num_a_blocks=model_cfg.num_a_blocks,
+      num_b_blocks=model_cfg.num_b_blocks,
+      num_c_blocks=model_cfg.num_c_blocks,
+      scale_a=model_cfg.scale_a,
+      scale_b=model_cfg.scale_b,
+      scale_c=model_cfg.scale_c,
+      head_dense_units=model_cfg.dense_units,
+      head_dropout=model_cfg.dropout_rate,
       use_gender=model_cfg.use_gender,
    )
 

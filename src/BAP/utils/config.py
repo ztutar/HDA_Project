@@ -32,13 +32,15 @@ class DataConfig:
 class ModelConfig:
    channels: list[int] = field(default_factory=lambda: [32, 64, 128])
    dense_units: int = 128
-   stem_filters: int = 32                    # Stem filters for ResNet-style model
+   base_filters: int = 32                    # Stem filters
    block_filters: list[int] = field(default_factory=lambda: [32, 64, 128, 256])
    blocks_per_stage: list[int] = field(default_factory=lambda: [2, 2, 2, 2])
-   inception_base_filters: int = 32         # Base filter multiplier for Inception-style model
-   inception_a_blocks: int = 2              # Number of Inception-A blocks
-   inception_b_blocks: int = 3              # Number of Inception-B blocks
-   inception_c_blocks: int = 1              # Number of Inception-C blocks
+   num_a_blocks: int = 2              # Number of Inception and InSkipCon A blocks
+   num_b_blocks: int = 3              # Number of Inception and InSkipCon B blocks
+   num_c_blocks: int = 1              # Number of Inception and InSkipCon C blocks
+   scale_a: float = 0.17
+   scale_b: float = 0.1
+   scale_c: float = 0.2
    use_gender: bool = False
    dropout_rate: float = 0.2
 

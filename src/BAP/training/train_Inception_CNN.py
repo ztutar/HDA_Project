@@ -112,10 +112,10 @@ def train_InceptionCNN(
    input_shape = (image_size, image_size, 1)
    model = build_InceptionCNN(
       input_shape=input_shape,
-      base_filters=model_cfg.inception_base_filters,
-      num_a_blocks=model_cfg.inception_a_blocks,
-      num_b_blocks=model_cfg.inception_b_blocks,
-      num_c_blocks=model_cfg.inception_c_blocks,
+      base_filters=model_cfg.base_filters,
+      num_a_blocks=model_cfg.num_a_blocks,
+      num_b_blocks=model_cfg.num_b_blocks,
+      num_c_blocks=model_cfg.num_c_blocks,
       head_dense_units=model_cfg.dense_units,
       head_dropout=model_cfg.dropout_rate,
       use_gender=model_cfg.use_gender,
