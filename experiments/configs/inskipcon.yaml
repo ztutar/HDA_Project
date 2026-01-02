@@ -1,7 +1,7 @@
 data:
   image_size: 256
   clahe: false
-  augment: true
+  augment: false
   batch_size: 8
 
 model:
@@ -14,7 +14,7 @@ model:
   scale_c: 0.2
   dense_units: 128
   dropout_rate: 0.2
-  use_gender: true
+  use_gender: false
 
 training:
   epochs: 70
