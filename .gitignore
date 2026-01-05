@@ -193,3 +193,4 @@ __pycache__/
 experiments/checkpoints/*
 
 model.png
+experiments/train_results_summary.xlsx
