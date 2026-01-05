@@ -25,6 +25,7 @@ import numpy as np
 from typing import Any, Dict, Sequence, Union
 from IPython.display import display
 from BAP.utils.dataset_loader import load_image_original, load_image_grayscale, apply_clahe
+from BAP.visualization.gradcam import compute_GradCAM, overlay_cam_on_image
 
 
 def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: int=4) -> None:
@@ -204,6 +205,61 @@ def display_raw_vs_clahe_images(metadata: pd.DataFrame, image_dir: Path) -> None
    plt.show()
    
 
+def display_gradcams(
+   models: Sequence[tuple[str, tf.keras.Model]],
+   train_metadata: pd.DataFrame,
+   image_dir: Path,
+   seed: int | None = None,
+   alpha: float = 0.35,
+) -> None:
+   """
+   Show a random training image alongside Grad-CAM overlays from four models.
+
+   Args:
+      models: Sequence of exactly four ``(name, model)`` pairs to visualize.
+      train_metadata: Training split metadata containing ``Image ID``.
+      image_dir: Directory holding the training PNGs named ``<Image ID>.png``.
+      seed: Optional seed for deterministic sampling.
+      alpha: Heatmap opacity for the overlays.
+
+   Raises:
+      ValueError: If ``models`` does not contain four entries.
+      FileNotFoundError: If the sampled image is missing on disk.
+   """
+   if len(models) != 4:
+      raise ValueError("models must contain exactly four (name, model) pairs.")
+
+   sample_row = train_metadata.sample(1, random_state=seed).iloc[0]
+   image_id = str(sample_row["Image ID"])
+   image_path = Path(image_dir) / f"{image_id}.png"
+   if not image_path.exists():
+      raise FileNotFoundError(f"Image not found at {image_path}")
+
+   base_image = load_image_original(str(image_path))
+   base_image_np = base_image.numpy()
+
+   overlays = []
+   for model_name, model in models:
+      cam = compute_GradCAM(model=model, image=base_image)
+      overlay = overlay_cam_on_image(base_image, cam, alpha=alpha)
+      overlays.append((model_name, overlay))
+
+   fig, axes = plt.subplots(1, 5, figsize=(18, 4))
+   axes = np.atleast_1d(axes)
+
+   axes[0].imshow(base_image_np)
+   axes[0].set_title(f"Original ID {image_id}")
+   axes[0].axis("off")
+
+   for ax, (model_name, overlay) in zip(axes[1:], overlays):
+      ax.imshow(overlay)
+      ax.set_title(f"{model_name} Grad-CAM")
+      ax.axis("off")
+
+   fig.suptitle("Training Sample with Grad-CAM Overlays", y=1.02)
+   plt.tight_layout()
+   plt.show()
+
 
 def plot_training_metrics(metrics_dict: Dict, model_name="Model"):
    """
@@ -348,7 +404,7 @@ def compare_models_table(
 
 def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
    """
-   Plot MAE and loss curves for all models in `model_metrics_dict` for side-by-side comparison.
+   Plot MAE curves for all models in `model_metrics_dict` for side-by-side comparison.
 
    Args:
       model_metrics_dict (Dict[str, Dict]): Mapping of model names to their metrics dicts
@@ -357,7 +413,7 @@ def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
    if not model_metrics_dict:
       raise ValueError("model_metrics_dict must contain at least one model entry.")
 
-   fig, axs = plt.subplots(1, 2, figsize=(16, 5))
+   fig, ax = plt.subplots(figsize=(8, 5))
 
    for model_name, metrics in model_metrics_dict.items():
       history = metrics.get("history")
@@ -366,30 +422,18 @@ def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
 
       mae = history.get("mae")
       val_mae = history.get("val_mae")
-      loss = history.get("loss")
-      val_loss = history.get("val_loss")
 
       if mae:
-         axs[0].plot(range(1, len(mae) + 1), mae, label=f"{model_name} Train")
+         ax.plot(range(1, len(mae) + 1), mae, label=f"{model_name} Train")
       if val_mae:
-         axs[0].plot(range(1, len(val_mae) + 1), val_mae, linestyle="--", label=f"{model_name} Val")
+         ax.plot(range(1, len(val_mae) + 1), val_mae, linestyle="--", label=f"{model_name} Val")
 
-      if loss:
-         axs[1].plot(range(1, len(loss) + 1), loss, label=f"{model_name} Train")
-      if val_loss:
-         axs[1].plot(range(1, len(val_loss) + 1), val_loss, linestyle="--", label=f"{model_name} Val")
-
-   axs[0].set_title("MAE per Epoch (All Models)")
-   axs[0].set_xlabel("Epoch")
-   axs[0].set_ylabel("MAE")
-   axs[0].grid(True, linestyle=":")
-   axs[0].legend()
-
-   axs[1].set_title("Loss per Epoch (All Models)")
-   axs[1].set_xlabel("Epoch")
-   axs[1].set_ylabel("Loss")
-   axs[1].grid(True, linestyle=":")
-   axs[1].legend()
+   ax.set_title("MAE per Epoch (All Models)")
+   ax.set_xlabel("Epoch")
+   ax.set_ylabel("MAE")
+   ax.set_ylim(top=60)
+   ax.grid(True, linestyle=":")
+   ax.legend()
 
    plt.tight_layout()
    plt.show()
