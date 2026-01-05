@@ -1,39 +1,50 @@
 {
   "BaseCNN": {
-  "num_params": 296097,
-  "training_time": 21481.622017383575,
-  "num_epochs_ran": 43,
-  "best_epoch_idx": 32
+    "num_params": 304417,
+    "training_time": 19514.85587644577,
+    "num_epochs_ran": 43,
+    "best_epoch_idx": 32
   },
   "BaseCNN_Gender": {
-  "num_params": 296625,
-  "training_time": 18106.40475130081,
-  "num_epochs_ran": 35,
-  "best_epoch_idx": 24
+    "num_params": 305457,
+    "training_time": 19457.411177396774,
+    "num_epochs_ran": 42,
+    "best_epoch_idx": 31
   },
-  "ROI_CNN": {
-    "num_params": 608705,
-    "training_time": 7948.263306856155,
-    "num_epochs_ran": 60,
-    "best_epoch_idx": 49
+  "SkipCon_CNN": {
+    "num_params": 714913,
+    "training_time": 17412.074719667435,
+    "num_epochs_ran": 47,
+    "best_epoch_idx": 36
   },
-  "ROI_CNN_Gender": {
-    "num_params": 609745,
-    "training_time": 5517.300566911697,
-    "num_epochs_ran": 49,
-    "best_epoch_idx": 38
+  "SkipCon_CNN_Gender": {
+    "num_params": 715953,
+    "training_time": 12515.275038480759,
+    "num_epochs_ran": 33,
+    "best_epoch_idx": 22
   },
-  "Fusion_CNN": {
-    "num_params": 921121,
-    "training_time": 36101.144145965576,
-    "num_epochs_ran": 64,
-    "best_epoch_idx": 53
+  "Inception_CNN": {
+    "num_params": 9368737,
+    "training_time": 19815.49721646309,
+    "num_epochs_ran": 39,
+    "best_epoch_idx": 28
   },
-  "Fusion_CNN_Gender": {
-    "num_params": 922161,
-    "training_time": 29755.15017747879,
-    "num_epochs_ran": 53,
-    "best_epoch_idx": 42
+  "Inception_CNN_Gender": {
+    "num_params": 9369777,
+    "training_time": 12259.92204618454,
+    "num_epochs_ran": 24,
+    "best_epoch_idx": 13
   },
-  "roi_extraction_time": 1530.9100019931793
+  "InSkipCon_CNN": {
+    "num_params": 11605665,
+    "training_time": 19622.287480592728,
+    "num_epochs_ran": 27,
+    "best_epoch_idx": 16
+  },
+  "InSkipCon_CNN_Gender": {
+    "num_params": 11606705,
+    "training_time": 15857.693217515945,
+    "num_epochs_ran": 24,
+    "best_epoch_idx": 13
+  }
 }
