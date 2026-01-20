@@ -15,7 +15,7 @@ Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. 
 
 ## Repository Layout
 
-```text
+```bash
 Bone_Age_Prediction/
 ├── main.py                         # Entry point that wires configs, datasets, and trainers
 ├── data/
@@ -46,12 +46,22 @@ Bone_Age_Prediction/
 ### Environment setup
 
 ```bash
+# Clone the repository locally
 git clone https://github.com/ztutar/HDA_Project.git
+
+# Change into the project directory
 cd HDA_Project
+
+# Create a virtual environment
 python -m venv .venv
+
+# Activate the virtual environment
 source .venv/bin/activate
+
+# Install dependencies
 pip install --upgrade pip
-pip install -e .                    # installs base deps
+pip install -e .                    
+
 # If you have CUDA support, also install:
 pip install tensorflow[and-cuda]
 ```
