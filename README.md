@@ -1,17 +1,22 @@
-# Bone Age Prediction - HDA Project
+# Bone Age Prediction - ML4HD Project
+
+```text
+Name:   Zeynep TUTAR
+ID:     2106038
+```
 
 Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. The scope is to predict bone age from hand X-rays with minimal error while experimenting with CNN variants (Base, SkipCon, Inception, InSkipCon) and config-driven training setups.
 
 ## Highlights
 
-- **Four model families**: `BaseCNN`, `SkipCon_CNN`, `Inception_CNN`, and `InSkipCon_CNN` share tf.data pipelines and callbacks but can be trained independently.
+- **Four model families**: `BaseCNN`, `SkipCon_CNN`, `Inception_CNN`, and `InSkipCon_CNN` models that can be trained independently.
 - **Config-driven experiments**: YAML files in `experiments/configs` describe data, model, and training settings.
 - **Experiment tracking**: checkpoints land in `experiments/checkpoints`, summaries append to `experiments/train_results_summary.csv`, and curated exports live in `model_checkpoint/`.
 
 ## Repository Layout
 
 ```text
-HDA_Project/
+Bone_Age_Prediction/
 ├── main.py                         # Entry point that wires configs, datasets, and trainers
 ├── data/
 │   ├── metadata/                   # CSV splits consumed by the tf.data pipelines
@@ -22,8 +27,8 @@ HDA_Project/
 │   └── train_results_summary.csv   # Aggregated run metrics + config values
 ├── src/BAP/
 │   ├── models/                     # Base_CNN.py, SkipCon_CNN.py, Inception_CNN.py, InSkipCon_CNN.py
-│   ├── training/                   # Trainer scripts, callbacks, summaries
-│   └── utils/                      # Config loader, dataset utilities, plotting, seed & path helpers
+│   ├── training/                   # Trainer scripts, callbacks
+│   └── utils/                      # Config loader, dataset utilities, plotting, summaries etc.
 ├── BoneAgePrediction.ipynb         # Interactive notebook for exploratory work
 ├── model_checkpoint/               # Keras exports + metrics/results dicts from notebook
 ├── report/                         # Slides and report
