@@ -4,7 +4,7 @@ Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. 
 
 ## Highlights
 
-- **Four model families**: `BaseCNN`, `SkipCon_CNN`, `Inception_CNN`, and `InSkipCon_CNN` (Inception-ResNet-style) share tf.data pipelines and callbacks but can be trained independently.
+- **Four model families**: `BaseCNN`, `SkipCon_CNN`, `Inception_CNN`, and `InSkipCon_CNN` share tf.data pipelines and callbacks but can be trained independently.
 - **Config-driven experiments**: YAML files in `experiments/configs` describe data, model, and training settings.
 - **Experiment tracking**: checkpoints land in `experiments/checkpoints`, summaries append to `experiments/train_results_summary.csv`, and curated exports live in `model_checkpoint/`.
 
