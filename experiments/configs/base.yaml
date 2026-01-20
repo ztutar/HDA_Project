@@ -1,3 +1,9 @@
+# Configuration file for the BaseCNN model in bone age prediction.
+# This config defines settings for data preprocessing, model architecture, and training parameters.
+# - Data section: Image size, CLAHE application, augmentation, and batch size.
+# - Model section: Convolutional channels, dense units, dropout, and gender usage.
+# - Training section: Epochs, patience, learning rate, results CSV, and test evaluation.
+
 data:
   image_size: 256
   clahe: false

@@ -1,18 +1,7 @@
-"""Visualization utilities for the Bone Age Prediction (BAP) project.
+"""
+This module provides plotting and visualization utilities for the bone age prediction project.
 
-This module centralizes all figures, tables, and quick-look plots that support
-dataset exploration, model debugging, and training diagnostics. Functions here
-focus on:
-
-* Sampling images to visually sanity-check metadata integrity.
-* Inspecting preprocessing steps (e.g., CLAHE) versus raw radiographs.
-* Displaying prediction quality on random samples to surface obvious failures.
-* Summarizing training runs via curves and styled tables for notebooks.
-* Comparing multiple experiments to quickly identify the best configuration.
-
-Every helper is intended for interactive use inside notebooks or ad-hoc
-analysis scripts; therefore, they directly render matplotlib figures or styled
-dataframes instead of returning low-level objects.
+It includes functions to display images, plot distributions, and compare model metrics.
 """
 
 import pandas as pd
@@ -25,21 +14,19 @@ import numpy as np
 from typing import Any, Dict, Sequence, Union
 from IPython.display import display
 from BAP.utils.dataset_loader import load_image_original, load_image_grayscale, apply_clahe
-from BAP.visualization.gradcam import compute_GradCAM, overlay_cam_on_image
-
 
 def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: int=4) -> None:
    """
-   Draw ``n_samples`` random radiographs and annotate them with metadata fields.
+   Display sample images from the dataset with metadata.
 
-   Args:
-      metadata (pd.DataFrame): Table containing at least ``Image ID``, ``Bone Age (months)``,
-         and ``male`` columns.
-      image_dir (Path): Directory with PNG files named as ``<Image ID>.png``.
-      n_samples (int): Number of images to visualize (defaults to 4).
-
-   Raises:
-      FileNotFoundError: If any sampled image is missing on disk.
+   Parameters
+   ----------
+   metadata : pd.DataFrame
+      DataFrame with image metadata.
+   image_dir : Path
+      Directory containing images.
+   n_samples : int
+      Number of samples to display.
    """
    sample_metadata = metadata.sample(n_samples)
    plt.figure(figsize=(15, 5))
@@ -57,12 +44,12 @@ def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: in
    
 def plot_distributions(metadata: Union[pd.DataFrame, Dict[str, pd.DataFrame]]) -> None:
    """
-   Plot bone age and gender distributions for each dataset split.
+   Plot distributions of bone age and gender for dataset splits.
 
-   Args:
-      metadata (Union[pd.DataFrame, Dict[str, pd.DataFrame]]): Either a single metadata
-         table (for backward compatibility) or a mapping of split name to metadata
-         DataFrame. Each DataFrame must contain ``Bone Age (months)`` and ``male``.
+   Parameters
+   ----------
+   metadata : Union[pd.DataFrame, Dict[str, pd.DataFrame]]
+      Metadata DataFrame or dictionary of splits.
    """
    # Accept legacy single-DataFrame input by wrapping it in a dict
    if isinstance(metadata, dict):
@@ -109,19 +96,21 @@ def display_test_predictions(
    seed: int | None = None,
 ) -> None:
    """
-   Display random examples from the test set alongside their predicted ages.
+   Display test predictions with true vs predicted ages.
 
-   Args:
-      metadata (pd.DataFrame): Test split metadata with ``Image ID`` and ``Bone Age (months)``.
-      predictions (Sequence[float] | np.ndarray): Model predictions aligned with ``metadata``.
-      image_dir (Path): Directory that contains the corresponding ``.png`` files.
-      n_samples (int): Number of random samples to display.
-      seed (int | None): Optional random seed for reproducibility.
-
-   Raises:
-      ValueError: If the predictions length mismatches the metadata length.
+   Parameters
+   ----------
+   metadata : pd.DataFrame
+      Test metadata.
+   predictions : Union[Sequence[float], np.ndarray]
+      Predicted ages.
+   image_dir : Path
+      Directory containing images.
+   n_samples : int
+      Number of samples to display.
+   seed : int | None
+      Random seed.
    """
-
    predictions_arr = np.asarray(predictions).reshape(-1)
    if len(predictions_arr) != len(metadata):
       raise ValueError(
@@ -164,16 +153,15 @@ def display_test_predictions(
 # Raw vs. CLAHE enhanced images
 def display_raw_vs_clahe_images(metadata: pd.DataFrame, image_dir: Path) -> None:
    """
-   Visualize a single random image and the effect of CLAHE preprocessing.
+   Display raw vs CLAHE enhanced images.
 
-   Args:
-      metadata (pd.DataFrame): Split metadata including ``Image ID``.
-      image_dir (Path): Directory containing the original ``.png`` files.
-
-   Raises:
-      FileNotFoundError: If the randomly selected image is missing.
+   Parameters
+   ----------
+   metadata : pd.DataFrame
+      Metadata DataFrame.
+   image_dir : Path
+      Directory containing images.
    """
-
    sample_row = metadata.sample(1).iloc[0]
    image_id = str(sample_row["Image ID"])
    image_path = Path(image_dir) / f"{image_id}.png"
@@ -203,75 +191,18 @@ def display_raw_vs_clahe_images(metadata: pd.DataFrame, image_dir: Path) -> None
    fig.suptitle("Raw vs CLAHE contrast enhancement", y=1.02)
    plt.tight_layout()
    plt.show()
-   
-
-def display_gradcams(
-   models: Sequence[tuple[str, tf.keras.Model]],
-   train_metadata: pd.DataFrame,
-   image_dir: Path,
-   seed: int | None = None,
-   alpha: float = 0.35,
-) -> None:
-   """
-   Show a random training image alongside Grad-CAM overlays from four models.
-
-   Args:
-      models: Sequence of exactly four ``(name, model)`` pairs to visualize.
-      train_metadata: Training split metadata containing ``Image ID``.
-      image_dir: Directory holding the training PNGs named ``<Image ID>.png``.
-      seed: Optional seed for deterministic sampling.
-      alpha: Heatmap opacity for the overlays.
-
-   Raises:
-      ValueError: If ``models`` does not contain four entries.
-      FileNotFoundError: If the sampled image is missing on disk.
-   """
-   if len(models) != 4:
-      raise ValueError("models must contain exactly four (name, model) pairs.")
-
-   sample_row = train_metadata.sample(1, random_state=seed).iloc[0]
-   image_id = str(sample_row["Image ID"])
-   image_path = Path(image_dir) / f"{image_id}.png"
-   if not image_path.exists():
-      raise FileNotFoundError(f"Image not found at {image_path}")
-
-   base_image = load_image_original(str(image_path))
-   base_image_np = base_image.numpy()
-
-   overlays = []
-   for model_name, model in models:
-      cam = compute_GradCAM(model=model, image=base_image)
-      overlay = overlay_cam_on_image(base_image, cam, alpha=alpha)
-      overlays.append((model_name, overlay))
-
-   fig, axes = plt.subplots(1, 5, figsize=(18, 4))
-   axes = np.atleast_1d(axes)
-
-   axes[0].imshow(base_image_np)
-   axes[0].set_title(f"Original ID {image_id}")
-   axes[0].axis("off")
-
-   for ax, (model_name, overlay) in zip(axes[1:], overlays):
-      ax.imshow(overlay)
-      ax.set_title(f"{model_name} Grad-CAM")
-      ax.axis("off")
-
-   fig.suptitle("Training Sample with Grad-CAM Overlays", y=1.02)
-   plt.tight_layout()
-   plt.show()
 
 
 def plot_training_metrics(metrics_dict: Dict, model_name="Model"):
    """
-   Plot MAE and loss learning curves (and epoch time if available) for a single model.
+   Plot training metrics for a model.
 
-   Args:
-      metrics_dict (Dict): Dictionary containing a Keras-style ``history`` plus optional
-         ``times_per_epoch`` list.
-      model_name (str): Label used in subplot titles.
-
-   Raises:
-      KeyError: If the required keys are not present in ``metrics_dict``.
+   Parameters
+   ----------
+   metrics_dict : Dict
+      Metrics dictionary.
+   model_name : str
+      Name of the model.
    """
    history = metrics_dict['history']
    times_per_epoch = metrics_dict.get('times_per_epoch')
@@ -304,11 +235,14 @@ def plot_training_metrics(metrics_dict: Dict, model_name="Model"):
 
 def training_metrics_table(metrics: Dict[str, Any], model_name: str) -> None:
    """
-   Display train/val/test loss, MAE, and RMSE metrics for a model in a compact table.
+   Display training metrics in a table.
 
-   Args:
-      metrics (Dict[str, Any]): Metrics dict containing keys like ``train_loss`` or ``val_mae``.
-      model_name (str): Name of the model to use as the table caption.
+   Parameters
+   ----------
+   metrics : Dict[str, Any]
+      Metrics dictionary.
+   model_name : str
+      Name of the model.
    """
    if not isinstance(metrics, dict) or not metrics:
       raise ValueError("metrics must be provided as a non-empty dictionary.")
@@ -343,11 +277,14 @@ def compare_models_table(
    model_metrics_dict: Dict[str, Dict[str, Any]],
 ) -> None:
    """
-   Display a consolidated table of metrics plus training stats for every model.
+   Compare models in a table.
 
-   Args:
-      model_results_dict (Dict[str, Dict[str, Any]]): Per-model results (e.g., num_params).
-      model_metrics_dict (Dict[str, Dict[str, Any]]): Per-model metrics with split-prefixed keys.
+   Parameters
+   ----------
+   model_results_dict : Dict[str, Dict[str, Any]]
+      Model results dictionary.
+   model_metrics_dict : Dict[str, Dict[str, Any]]
+      Model metrics dictionary.
    """
    model_names = sorted(set(model_results_dict.keys()) | set(model_metrics_dict.keys()))
    if not model_names:
@@ -404,11 +341,12 @@ def compare_models_table(
 
 def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
    """
-   Plot MAE curves for all models in `model_metrics_dict` for side-by-side comparison.
+   Compare training metrics across models.
 
-   Args:
-      model_metrics_dict (Dict[str, Dict]): Mapping of model names to their metrics dicts
-         (same structure used by `plot_training_metrics`).
+   Parameters
+   ----------
+   model_metrics_dict : Dict[str, Dict]
+      Model metrics dictionary.
    """
    if not model_metrics_dict:
       raise ValueError("model_metrics_dict must contain at least one model entry.")
@@ -420,13 +358,16 @@ def compare_training_metrics(model_metrics_dict: Dict[str, Dict]) -> None:
       if history is None:
          raise ValueError(f"Missing 'history' for model '{model_name}'.")
 
-      mae = history.get("mae")
       val_mae = history.get("val_mae")
 
-      if mae:
-         ax.plot(range(1, len(mae) + 1), mae, label=f"{model_name} Train")
       if val_mae:
-         ax.plot(range(1, len(val_mae) + 1), val_mae, linestyle="--", label=f"{model_name} Val")
+         linestyle = "-" if "_Gender" in model_name else "--"
+         ax.plot(
+            range(1, len(val_mae) + 1),
+            val_mae,
+            linestyle=linestyle,
+            label=f"{model_name} Val",
+         )
 
    ax.set_title("MAE per Epoch (All Models)")
    ax.set_xlabel("Epoch")
@@ -445,16 +386,17 @@ def plot_best_epoch_metrics(
    splits: Sequence[str] = ("train", "val", "test"),
 ) -> None:
    """
-   Compare loss and MAE scores (captured at each model's best epoch) across all splits.
+   Plot best epoch metrics for models.
 
-   Args:
-      model_metrics_dict (Dict[str, Dict]): Aggregated per-model metrics containing keys like
-         ``train_loss``, ``val_mae`` and ``test_mae`` that hold the score at the selected epoch.
-      model_results_dict (Dict[str, Dict]): Metadata per model with ``num_params`` and
-         ``training_time`` values to annotate the bars.
-      splits (Sequence[str]): Ordered sequence of split prefixes (e.g. ``train``) to include.
+   Parameters
+   ----------
+   model_metrics_dict : Dict[str, Dict]
+       Model metrics dictionary.
+   model_results_dict : Dict[str, Dict]
+       Model results dictionary.
+   splits : Sequence[str]
+       Splits to plot.
    """
-
    if not model_metrics_dict:
       raise ValueError("model_metrics_dict must contain at least one model entry.")
 
@@ -462,81 +404,49 @@ def plot_best_epoch_metrics(
    if not model_names:
       raise ValueError("No overlapping models found between metrics and results dictionaries.")
 
-   metrics_to_plot = ("loss", "mae")
    num_models = len(model_names)
    num_splits = len(splits)
    x = np.arange(num_models)
    width = 0.8 / max(num_splits, 1)
    palette = sns.color_palette("tab10", n_colors=num_splits)
 
-   fig, axes = plt.subplots(1, len(metrics_to_plot), figsize=(8 * len(metrics_to_plot), 5), sharey=False)
-   axes = np.atleast_1d(axes)
-
-   def _format_param_count(count: Union[int, float, None]) -> str:
-      if count is None or not np.isfinite(count):
-         return "params N/A"
-      count = float(count)
-      if count >= 1e6:
-         return f"{count / 1e6:.2f}M params"
-      if count >= 1e3:
-         return f"{count / 1e3:.2f}K params"
-      return f"{int(count)} params"
-
-   def _format_training_time(seconds: Union[float, None]) -> str:
-      if seconds is None or not np.isfinite(seconds):
-         return "time N/A"
-      seconds = int(round(seconds))
-      hours, remainder = divmod(seconds, 3600)
-      minutes, secs = divmod(remainder, 60)
-      parts = []
-      if hours:
-         parts.append(f"{hours}h")
-      if minutes:
-         parts.append(f"{minutes}m")
-      if secs or not parts:
-         parts.append(f"{secs}s")
-      return " ".join(parts)
+   fig, ax = plt.subplots(figsize=(8, 5))
 
    split_labels = {s: s.title() for s in splits}
 
-   for ax, metric in zip(axes, metrics_to_plot):
-      for idx, split in enumerate(splits):
-         key = f"{split}_{metric}"
-         offsets = x + (idx - (num_splits - 1) / 2) * width
-         values = []
-         for name in model_names:
-            value = model_metrics_dict[name].get(key)
-            values.append(value if value is not None else np.nan)
-         bars = ax.bar(offsets, values, width=width, color=palette[idx], label=f"{split_labels.get(split, split)} {metric.upper()}")
+   for idx, split in enumerate(splits):
+      key = f"{split}_mae"
+      offsets = x + (idx - (num_splits - 1) / 2) * width
+      values = []
+      for name in model_names:
+         value = model_metrics_dict[name].get(key)
+         values.append(value if value is not None else np.nan)
+      bars = ax.bar(offsets, values, width=width, color=palette[idx], label=f"{split_labels.get(split, split)} MAE")
 
-         for bar_idx, bar in enumerate(bars):
-            value = values[bar_idx]
-            if value is None or not np.isfinite(value):
-               continue
-            model_name = model_names[bar_idx]
-            result_meta = model_results_dict.get(model_name, {})
-            annotation = (
-               f"{value:.3f}\n"
-               f"{_format_param_count(result_meta.get('num_params'))}\n"
-               f"{_format_training_time(result_meta.get('training_time'))}"
-            )
-            ax.text(
-               bar.get_x() + bar.get_width() / 2,
-               bar.get_height(),
-               annotation,
-               ha="center",
-               va="bottom",
-               fontsize=8,
-               rotation=0,
-            )
+      for bar_idx, bar in enumerate(bars):
+         value = values[bar_idx]
+         if value is None or not np.isfinite(value):
+            continue
+         model_name = model_names[bar_idx]
+         ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{value:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            rotation=0,
+         )
 
-      ax.set_title(f"{metric.upper()} at Best Epoch")
-      ax.set_ylabel(metric.upper())
-      ax.set_xticks(x)
-      ax.set_xticklabels(model_names, rotation=20, ha="right")
-      ax.grid(axis="y", linestyle=":", alpha=0.4)
-      ax.legend()
+   ax.set_title("MAE at Best Epoch")
+   ax.set_ylabel("MAE")
+   ax.set_xticks(x)
+   ax.set_xticklabels(model_names, rotation=20, ha="right")
+   ax.grid(axis="y", linestyle=":", alpha=0.4)
+   ax.legend()
 
-   fig.suptitle("Model Comparisons - Loss and MAE per Split", fontsize=14)
+   fig.suptitle("Model Comparisons - MAE per Split", fontsize=14)
    plt.tight_layout(rect=[0, 0, 1, 0.94])
    plt.show()
+
+

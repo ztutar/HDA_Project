@@ -1,4 +1,9 @@
-"""Training entry point for the ResNet-style CNN with residual skips."""
+"""
+This module contains the training logic for the SkipConCNN model used in bone age prediction.
+
+The train_SkipConCNN function handles the complete training pipeline including data preparation,
+model building, compilation, training, evaluation, and saving results.
+"""
 
 from typing import Tuple
 import gc
@@ -14,11 +19,12 @@ from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_dataset
 from BAP.utils.path_manager import save_model_dicts
+from BAP.utils.summary import append_summary_row
 
 from BAP.models.SkipCon_CNN import build_SkipConCNN
 
 from BAP.training.callbacks import make_callbacks
-from BAP.training.summary import append_summary_row
+
 
 logger = get_logger(__name__)
 
@@ -28,8 +34,26 @@ def train_SkipConCNN(
    config_bundle: ProjectConfig,
    save_dir: str,
 ) -> Tuple[keras.Model, keras.callbacks.History]:
-   """Train, evaluate, and persist a ResNet-style CNN."""
+   """
+   Train the SkipConCNN model for bone age prediction.
 
+   This function performs the entire training process including data loading, model construction,
+   training with callbacks, evaluation, and saving results to disk.
+
+   Parameters
+   ----------
+   paths : dict
+      Dictionary containing paths to train, validation, and test image directories.
+   config_bundle : ProjectConfig
+      Configuration object containing data, model, and training settings.
+   save_dir : str
+      Directory path where model checkpoints and results will be saved.
+
+   Returns
+   -------
+   Tuple[keras.Model, keras.callbacks.History]
+      The trained Keras model and the training history object.
+   """
    mirror_keras_stdout_to_file()
 
    model_name = "SkipCon_CNN"

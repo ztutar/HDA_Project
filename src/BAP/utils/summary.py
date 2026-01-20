@@ -1,9 +1,7 @@
-"""Utilities for maintaining the experiment summary CSV.
-
-The functions in this module keep the `results.csv` file up to date by
-flattening nested configuration objects, migrating legacy formats, and ensuring
-each run appends a consistent row. They are designed to be run repeatedly
-without manual cleanup, so they aggressively normalize headers and values.
+"""
+This module provides utilities for managing training summary data in CSV format.
+It handles appending rows to experiment summaries, migrating legacy formats,
+and ensuring consistent structure for configuration parameters.
 """
 
 from __future__ import annotations
@@ -48,18 +46,15 @@ def _flatten_mapping(
    mapping: Mapping[str, Any],
    parent_key: str = "",
 ) -> Dict[str, Any]:
-   """Recursively flatten nested mappings into dotted-key dictionaries.
-
+   """
+   Flattens a nested mapping into a single-level dictionary with dot-separated keys.
+   
    Args:
-      mapping:
-         Arbitrary mapping that may contain nested dict-like values.
-      parent_key:
-         Prefix applied to nested keys; used internally during recursion.
-
+      mapping (Mapping[str, Any]): The nested mapping to flatten.
+      parent_key (str): The parent key prefix for nested keys. Default is "".
+   
    Returns:
-      Dict[str, Any]
-         A single-level dictionary where `foo.bar` denotes the `bar` key within the
-         nested `foo` dictionary.
+      Dict[str, Any]: A flattened dictionary.
    """
    items: Dict[str, Any] = {}
    for key, value in mapping.items():
@@ -72,11 +67,14 @@ def _flatten_mapping(
 
 
 def _format_config_value(value: Any) -> str:
-   """Normalize configuration values to strings that are safe for CSV storage.
-
-   Lists and dictionaries are JSON-encoded to preserve structure while
-   remaining deterministic (sorted keys for dicts). `None` collapses to
-   ``NA_VALUE`` so missing information is explicit in the output file.
+   """
+   Formats a configuration value for CSV storage.
+   
+   Args:
+      value (Any): The value to format.
+   
+   Returns:
+      str: The formatted string representation.
    """
    if isinstance(value, (dict, list)):
       return json.dumps(value, sort_keys=isinstance(value, dict))
@@ -86,11 +84,11 @@ def _format_config_value(value: Any) -> str:
 
 
 def _get_default_config_keys() -> List[str]:
-   """Return the sorted list of configuration keys derived from defaults.
-
-   Instantiates a `ProjectConfig` with default child configs, flattens the
-   resulting dataclass tree, and caches the keys so repeated calls avoid
-   redundant work.
+   """
+   Gets the sorted list of default configuration keys from ProjectConfig.
+   
+   Returns:
+      List[str]: The list of default configuration keys.
    """
    global _DEFAULT_CONFIG_KEYS
    if _DEFAULT_CONFIG_KEYS is None:
@@ -108,16 +106,14 @@ def _get_default_config_keys() -> List[str]:
 
 
 def _read_existing_header(results_csv: str) -> List[str] | None:
-   """Read the header row from an existing summary file, if any.
-
+   """
+   Reads the header from an existing CSV file.
+   
    Args:
-   results_csv:
-      Absolute or relative path to the summary CSV.
-
+      results_csv (str): Path to the CSV file.
+   
    Returns:
-   list[str] | None
-      The header fields if the file exists and contains at least one row,
-      otherwise ``None``.
+      List[str] | None: The header list if the file exists, otherwise None.
    """
    if not os.path.exists(results_csv):
       return None
@@ -133,16 +129,15 @@ def _migrate_legacy_summary(
    results_csv: str,
    desired_keys: Sequence[str],
 ) -> List[str]:
-   """Expand legacy summary files that store configurations as raw JSON blobs.
-
-   Old summaries kept the entire configuration inside a `config_params` column.
-   This function rewrites the file so each flattened configuration key receives
-   its own column, merging keys from both legacy rows and the requested
-   ``desired_keys``.
-
+   """
+   Migrates a legacy summary CSV to the new format.
+   
+   Args:
+      results_csv (str): Path to the CSV file.
+      desired_keys (Sequence[str]): The desired configuration keys.
+   
    Returns:
-   list[str]
-      The sorted collection of config keys used in the rewritten file.
+      List[str]: The final configuration keys.
    """
    with open(results_csv, newline="") as f:
       reader = csv.DictReader(f)

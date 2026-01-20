@@ -1,13 +1,7 @@
-"""Utilities for loading and validating experiment configuration files.
+"""
+This module provides configuration management for the bone age prediction project.
 
-The module defines dataclasses that hold defaults for data, pre-processing,
-model, and training parameters. The `load_config` entrypoint reads a YAML file,
-merges it with the defaults, coerces values to the expected types, and returns a
-`ProjectConfig` object that keeps both the structured view and the original raw
-mapping so callers can inspect untouched keys if needed. Helper utilities
-sanity-check the incoming dictionary by discarding unknown fields and converting
-string inputs to numbers, booleans, or sequences whenever possible to keep the
-runtime configuration consistent across different sources (CLI, YAML, API).
+It includes dataclasses for different configuration sections and functions to load and process configuration files.
 """
 
 from dataclasses import dataclass, field, fields
@@ -17,7 +11,6 @@ import yaml
 #from BAP.utils.logger import get_logger
 
 #logger = get_logger(__name__)
-
 
 CONFIG_BASE_DIR = Path("experiments/configs")
 
@@ -62,26 +55,18 @@ class ProjectConfig:
    
 
 def load_config(path: Optional[str] = None) -> ProjectConfig:
-   """Load a configuration file and return a fully populated `ProjectConfig`.
+   """
+   Load a project configuration from a YAML file or use defaults.
 
    Parameters
    ----------
-   path:
-      Optional path to a YAML configuration file. When omitted, defaults defined
-      in the dataclasses are used. Relative paths are resolved under
-      `experiments/configs`.
+   path : Optional[str]
+      Path to the YAML configuration file. If None, uses default configurations.
 
    Returns
    -------
    ProjectConfig
-      Structured configuration ready for consumption by training or inference
-      pipelines. Contains both typed sections and the original raw dictionary.
-
-   Raises
-   ------
-   ValueError
-      If the file cannot be read, the YAML cannot be parsed, or the top-level
-      structure is not a mapping.
+      The loaded project configuration object.
    """
    if path is None:
       #logger.info("No config path provided; using defaults.")
@@ -143,12 +128,20 @@ def load_config(path: Optional[str] = None) -> ProjectConfig:
 
 # Filter a section to only include known fields of the dataclass type.
 def _filter_known_fields(section: Dict[str, Any], dataclass_type: type) -> Dict[str, Any]:
-   """Return a copy of `section` containing only keys defined on `dataclass_type`.
+   """
+   Filter a configuration section to only include known fields of the dataclass type.
 
-   The function also coerces values to the field's annotated type so downstream
-   dataclass construction receives clean inputs. Unknown keys are ignored
-   silently, which shields the loader from typos or future fields that older
-   code does not yet understand.
+   Parameters
+   ----------
+   section : Dict[str, Any]
+      The configuration section dictionary.
+   dataclass_type : type
+      The dataclass type to filter against.
+
+   Returns
+   -------
+   Dict[str, Any]
+      The filtered dictionary with only known fields.
    """
    field_map = {dataclass_field.name: dataclass_field for dataclass_field in fields(dataclass_type)}
    filtered_section = {}
@@ -159,11 +152,20 @@ def _filter_known_fields(section: Dict[str, Any], dataclass_type: type) -> Dict[
 
 # Coerce a value to the expected field type, handling basic conversions.
 def _coerce_to_field_type(value: Any, field_type: Any) -> Any:
-   """Coerce `value` to `field_type` when obvious conversions are available.
+   """
+   Coerce a value to the expected field type, handling basic conversions.
 
-   Handles common string-to-bool/float/int conversions, as well as recursive
-   coercion of homogeneous lists/tuples. Values that cannot be converted are
-   returned unchanged so the caller can decide how to handle the mismatch.
+   Parameters
+   ----------
+   value : Any
+      The value to coerce.
+   field_type : Any
+      The expected type.
+
+   Returns
+   -------
+   Any
+      The coerced value.
    """
    origin = get_origin(field_type)
    if origin in (list, tuple) and isinstance(value, (list, tuple)):

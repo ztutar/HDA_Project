@@ -1,9 +1,14 @@
-"""Inception-v4-style CNN backbone for bone age regression."""
+"""
+This module provides functionality to build an Inception Convolutional Neural Network (CNN) model
+for bone age prediction. The model is based on the Inception-v4 architecture and can optionally
+include gender information as an additional input to predict age in months.
+"""
 
 from typing import Optional, Tuple
 
 import tensorflow as tf
 from keras import Model, layers
+
 
 # Main model construction
 def build_InceptionCNN(
@@ -16,7 +21,22 @@ def build_InceptionCNN(
    head_dropout: float = 0.3,
    use_gender: bool = False,
 ) -> Model:
-   """Construct an Inception-v4-inspired CNN for bone-age regression."""
+   """
+   Builds an Inception CNN model for bone age prediction based on Inception-v4 architecture.
+   
+   Args:
+      input_shape (Tuple[int, int, int]): Shape of the input image (height, width, channels). Default is (512, 512, 1).
+      base_filters (int): Base number of filters used in the model. Default is 32.
+      num_a_blocks (int): Number of Inception-A blocks. Default is 4.
+      num_b_blocks (int): Number of Inception-B blocks. Default is 7.
+      num_c_blocks (int): Number of Inception-C blocks. Default is 3.
+      head_dense_units (int): Number of units in the head dense layer. Default is 128.
+      head_dropout (float): Dropout rate for the head. Default is 0.3.
+      use_gender (bool): Whether to include gender as an additional input. Default is False.
+   
+   Returns:
+      Model: A Keras Model instance for bone age prediction.
+   """
    image_input = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
 
    x = Stem(image_input, base_filters=base_filters)
@@ -65,6 +85,20 @@ def Conv_BN_ReLU(
    padding: str = "same",
    name: Optional[str] = None,
 ) -> tf.Tensor:
+   """
+   Applies a sequence of Conv2D, BatchNormalization, and ReLU activation.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      filters (int): Number of filters for the Conv2D layer.
+      kernel_size: Kernel size for the Conv2D layer.
+      strides (int): Strides for the Conv2D layer. Default is 1.
+      padding (str): Padding mode. Default is "same".
+      name (Optional[str]): Name prefix for the layers.
+   
+   Returns:
+      tf.Tensor: Output tensor after Conv2D -> BN -> ReLU.
+   """
    """Conv2D -> BatchNorm -> ReLU helper."""
    x = layers.Conv2D(
       filters=filters,
@@ -79,6 +113,16 @@ def Conv_BN_ReLU(
 
 # Stem block
 def Stem(x: tf.Tensor, base_filters: int) -> tf.Tensor:
+   """
+   Builds the Inception-v4 stem block with factorized downsamples.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+   
+   Returns:
+      tf.Tensor: Output tensor after stem processing.
+   """
    """Inception-v4 stem with factorized downsamples."""
    x = Conv_BN_ReLU(x, filters=base_filters, kernel_size=3, strides=2, padding="same", name="stem_conv1")
    x = Conv_BN_ReLU(x, filters=base_filters, kernel_size=3, padding="same", name="stem_conv2")
@@ -97,6 +141,17 @@ def Stem(x: tf.Tensor, base_filters: int) -> tf.Tensor:
 
 # Inception-A block
 def Inception_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the 35x35 grid Inception-A block from Inception-v4.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-A processing.
+   """
    """35x35 grid Inception-A block (v4)."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 2, kernel_size=1, name=f"{name}_b1")
 
@@ -114,6 +169,17 @@ def Inception_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
 
 # Reduction-A block
 def Reduction_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the Reduction-A block from Inception-v4.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Reduction-A processing.
+   """
    """Reduction-A block from Inception-v4."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=3, strides=2, padding="same", name=f"{name}_b1")
 
@@ -127,6 +193,17 @@ def Reduction_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
 
 # Inception-B block
 def Inception_B(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the 17x17 grid Inception-B block with factorized convolutions from Inception-v4.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-B processing.
+   """
    """17x17 grid Inception-B block with factorized convolutions (v4)."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=1, name=f"{name}_b1")
 
@@ -147,6 +224,17 @@ def Inception_B(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
 
 # Reduction-B block
 def Reduction_B(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the Reduction-B block from Inception-v4 (17x17 -> 8x8).
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Reduction-B processing.
+   """
    """Reduction-B block from Inception-v4 (17x17 -> 8x8)."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=1, name=f"{name}_b1_reduce")
    b1 = Conv_BN_ReLU(b1, filters=base_filters * 8, kernel_size=3, strides=2, padding="same", name=f"{name}_b1")
@@ -162,6 +250,17 @@ def Reduction_B(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
 
 # Inception-C block
 def Inception_C(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the 8x8 grid Inception-C block from Inception-v4 with split convolutions.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-C processing.
+   """
    """8x8 grid Inception-C block (v4) with split convolutions."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=1, name=f"{name}_b1")
 

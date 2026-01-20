@@ -1,19 +1,9 @@
 
-"""Utility helpers for consistent, application-wide logging configuration.
-
-This module centralizes logging setup for both console and file outputs and
-provides a lightweight bridge that mirrors verbose Keras callback stdout
-messages back into the active log file.  The helpers are designed to be
-imported anywhere in the codebase so that loggers remain uniform (same
-formatting, timestamps, levels) while still allowing each caller to choose
-its own logger name.
-
-Functions exposed here are intentionally side-effectful: `setup_logging`
-configures handlers on the root logger once, `mirror_keras_stdout_to_file`
-monkey-patches Keras utilities exactly once in a thread-safe fashion, and
-`get_logger` simply returns a logger by name without adding handlers.  
 """
+This module provides logging utilities for the bone age prediction project.
 
+It includes functions to set up logging, mirror Keras output to files, and get loggers.
+"""
 
 import logging
 import os
@@ -22,7 +12,6 @@ import threading
 from datetime import datetime
 from importlib import import_module
 from typing import Optional, Sequence, Tuple
-
 
 _FILE_HANDLER: Optional[logging.Handler] = None
 _KERAS_STDOUT_PATCHED = False
@@ -35,31 +24,25 @@ def setup_logging(
    name: Optional[str] = None,
    propagate: bool = False,
 ) -> logging.Logger:
-   """Configure and return a logger ready for console/file output.
+   """
+   Set up logging with console and optional file output.
 
    Parameters
    ----------
-   log_dir:
-      Optional directory where a timestamped log file should be created. The
-      directory is created if it does not exist. When omitted, only console
-      logging is enabled.
-   level:
-      Logging level string understood by the `logging` module (e.g. ``"INFO"``,
-      ``"DEBUG"``). Anything unknown defaults to ``logging.INFO``.
-   name:
-      Name of the logger to configure. Passing ``None`` or an empty string
-      targets the root logger so that child loggers inherit the handlers.
-   propagate:
-      Whether messages emitted by the configured logger should bubble up to
-      parent loggers. Defaults to ``False`` to avoid duplicate entries.
+   log_dir : Optional[str]
+      Directory to save log files.
+   level : str
+      Logging level.
+   name : Optional[str]
+      Logger name.
+   propagate : bool
+      Whether to propagate logs to parent loggers.
 
    Returns
    -------
    logging.Logger
-      The configured logger instance. Subsequent calls with the same name will
-      return the existing logger without re-adding handlers.
+      The configured logger.
    """
-
    global _FILE_HANDLER
 
    logger = logging.getLogger(name or "")
@@ -94,11 +77,13 @@ def setup_logging(
 
 
 def _detect_file_handler() -> Optional[logging.Handler]:
-   """Return the first file handler attached to the root logger, if any.
+   """
+   Detect an existing file handler in the root logger.
 
-   This helper is used when Keras stdout mirroring needs to piggyback on the
-   already-configured file handler instead of creating a new one.  It keeps
-   the mirroring logic lightweight and avoids leaking duplicate files.
+   Returns
+   -------
+   Optional[logging.Handler]
+      The file handler if found, else None.
    """
    for handler in logging.getLogger().handlers:
       if isinstance(handler, logging.FileHandler):
@@ -107,20 +92,13 @@ def _detect_file_handler() -> Optional[logging.Handler]:
 
 
 def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
-   """Mirror Keras callback stdout messages into the active log file.
-
-   Keras callback internals frequently write progress updates via their own
-   `io_utils.print_msg` helper, bypassing Python's logging framework.  This
-   function monkey-patches every discoverable variant of that helper so that
-   emitted lines also flow into the same file handler configured by
-   `setup_logging`.  The patch is applied once in a thread-safe manner and is
-   skipped entirely when no file handler is available.
+   """
+   Mirror Keras stdout output to the log file.
 
    Parameters
    ----------
-   level:
-      Logging level used when replaying the mirrored stdout lines. The default
-      ``"INFO"`` level keeps parity with most Keras progress messages.
+   level : str
+      Logging level for mirrored messages.
    """
    global _KERAS_STDOUT_PATCHED, _FILE_HANDLER
 
@@ -198,18 +176,17 @@ def mirror_keras_stdout_to_file(level: str = "INFO") -> None:
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
-   """Return an existing logger without modifying handlers.
+   """
+   Get a logger instance.
 
    Parameters
    ----------
-   name:
-      Logger name to retrieve. When ``None`` (or empty), the root logger is
-      returned, allowing modules to reuse the configuration produced by
-      `setup_logging`.
+   name : Optional[str]
+      Logger name.
 
    Returns
    -------
    logging.Logger
-      The existing logger instance; no handlers or levels are altered.
+      The logger instance.
    """
    return logging.getLogger(name or "")

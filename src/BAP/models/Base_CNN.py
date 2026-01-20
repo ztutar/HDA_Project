@@ -1,15 +1,7 @@
-
-"""Base convolutional neural network used for bone age regression.
-
-This module defines a single factory function, `build_BaseCNN`, that assembles
-the end-to-end Keras model. The network stacks multiple convolutional blocks
-with BatchNorm and ReLU activations, downsamples via max pooling, aggregates
-features with global average pooling, and projects them through a dense head for
-age prediction. Optional gender metadata is embedded and concatenated prior to
-the regression head so structured inputs can modulate the prediction. The
-function exposes tunable hyperparameters (input shape, channel widths, dense
-units, dropout, gender flag) so experiments can reuse a consistent topology
-while adjusting capacity.
+"""
+This module provides functionality to build a Base Convolutional Neural Network (CNN) model
+for bone age prediction. The model is designed to process input images and optionally gender
+information to predict the age in months.
 """
 
 from typing import Sequence, Tuple
@@ -26,30 +18,18 @@ def build_BaseCNN(
    dropout_rate: float = 0.2,
    use_gender: bool = False
 ) -> Model:
-   """Construct the Base CNN with optional gender metadata.
-
-   The network is organized as a stack of convolutional blocks that each apply
-   two `Conv2D → BatchNorm → ReLU` sequences followed by max pooling, producing
-   progressively coarser yet wider feature maps whose widths are drawn from the
-   `channels` tuple. Global average pooling collapses the spatial dimension into
-   a single feature vector that feeds a dense regression head. When `use_gender`
-   is enabled, the function also adds an integer gender input, embeds it into an
-   8-d vector, and concatenates it with the pooled visual features so the model
-   can leverage demographic priors before the dense layers.
-
+   """
+   Builds a Base CNN model for bone age prediction.
+   
    Args:
-      input_shape: Height, width, and channel count for the radiograph tensor.
-      channels: Number of filters for each convolutional block; also controls
-         the number of blocks because one block is created per entry.
-      dense_units: Width of the penultimate `Dense` layer preceding regression.
-      dropout_rate: Dropout probability applied before the dense head; set to 0
-         to disable the layer.
-      use_gender: If True, expect an additional gender input and inject its 
-      learned embedding into the pooled features.
-
+      input_shape (Tuple[int, int, int]): Shape of the input image (height, width, channels). Default is (512, 512, 1).
+      channels (Sequence[int]): Number of filters for each convolutional block. Default is (32, 64, 128).
+      dense_units (int): Number of units in the dense layer. Default is 64.
+      dropout_rate (float): Dropout rate for regularization. Default is 0.2.
+      use_gender (bool): Whether to include gender as an additional input. Default is False.
+   
    Returns:
-      A compiled Keras `Model` that maps image (and optional gender) inputs to a
-      scalar age prediction in months.
+      Model: A Keras Model instance for bone age prediction.
    """
    input_image = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
    

@@ -1,13 +1,8 @@
-"""Dataset construction utilities for bone-age prediction pipelines.
+"""
+This module provides utilities for loading and preprocessing the RSNA bone age dataset.
 
-This module centralizes helpers that download the RSNA bone-age data from
-Kaggle Hub, assemble different ``tf.data`` pipelines (full radiographs,
-pre-extracted regions of interest, and fusion inputs), and apply common
-image preprocessing operations such as grayscale decoding, CLAHE contrast
-enhancement, and data augmentation. All loaders emit dictionaries of 
-model-ready tensors alongside the target bone age so that higher-level
-training code can remain agnostic to how the data was prepared."""
-
+It includes functions to download the dataset, create TensorFlow datasets, and apply image preprocessing.
+"""
 
 import cv2
 from typing import Dict
@@ -20,16 +15,20 @@ import pandas as pd
 
 #logger = get_logger(__name__)
 
+
 def get_rsna_dataset(force_download=False) -> dict[str, Path]:
-   """Return paths to the RSNA bone-age dataset, downloading it if required.
+   """
+   Download and return paths to the RSNA bone age dataset splits.
 
-   Args:
-      force_download: When ``True`` forces Kaggle Hub to re-download the
-         dataset even if it is already cached locally.
+   Parameters
+   ----------
+   force_download : bool
+      Whether to force re-download of the dataset.
 
-   Returns:
-      A mapping containing the dataset root along with sub-directories for
-      the training, validation, and test image folders.
+   Returns
+   -------
+   dict[str, Path]
+      Dictionary with paths to root, train, validation, and test directories.
    """
    root = Path(kagglehub.dataset_download("ipythonx/rsna-bone-age", force_download=force_download))
    return {
@@ -49,25 +48,27 @@ def make_dataset(
    clahe: bool = False,
    augment: bool = False,
 ) -> tf.data.Dataset:
-   """Build a ``tf.data`` pipeline for full radiograph images.
-
-   Each example contains the resized grayscale image tensor and auxiliary
-   metadata (gender and ID). CLAHE and augmentation are optional and are
-   executed inside the dataset graph for GPU-friendly performance.
-
-   Args:
-      image_dir: Directory containing PNG radiographs named by ``Image ID``.
-      metadata: DataFrame with at minimum ``Image ID`` and ``Bone Age (months)``
-         columns and optionally ``male``.
-      image_size: Target square resolution for resizing the images.
-      clahe: Enables contrast-limited adaptive histogram equalization.
-      augment: Enables random flips, small rotations, and photometric jitter.
-
-   Returns:
-      A dataset yielding ``(features, age)`` tuples where ``features`` is a
-      dictionary with normalized image tensors and auxiliary fields.
    """
+   Create a TensorFlow dataset from image directory and metadata.
 
+   Parameters
+   ----------
+   image_dir : Path
+      Path to the directory containing images.
+   metadata : pd.DataFrame
+      DataFrame with image metadata.
+   image_size : int
+      Target image size.
+   clahe : bool
+      Whether to apply CLAHE.
+   augment : bool
+      Whether to apply data augmentation.
+
+   Returns
+   -------
+   tf.data.Dataset
+      The prepared TensorFlow dataset.
+   """
    image_ids = metadata["Image ID"].astype(str).tolist()
    ages = metadata["Bone Age (months)"].astype(np.float32).tolist()
    male_column = metadata.get("male")
@@ -82,6 +83,23 @@ def make_dataset(
    ))
 
    def _load_example(image_id: tf.Tensor, age: tf.Tensor, gender: tf.Tensor):
+      """
+      Load and preprocess a single example.
+
+      Parameters
+      ----------
+      image_id : tf.Tensor
+         Image ID tensor.
+      age : tf.Tensor
+         Age tensor.
+      gender : tf.Tensor
+         Gender tensor.
+
+      Returns
+      -------  
+      tuple
+         A tuple of (features dict, age).
+      """
       image_path = tf.strings.join([base_dir, "/", image_id, ".png"])
       image = load_image_grayscale(image_path)
       image = tf.image.resize(image, (image_size, image_size), antialias=True)
@@ -108,13 +126,18 @@ def make_dataset(
 # HELPER FUNCTIONS
 # -----------------------------------------
 def load_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
-   """Read a PNG image and convert it to a normalized single-channel tensor.
+   """
+   Load a grayscale image from file path.
 
-   Args:
-      image_path: Scalar string tensor with the absolute path to the PNG file.
+   Parameters
+   ----------
+   image_path : tf.Tensor
+      Path to the image file.
 
-   Returns:
-      Float32 tensor of shape ``[H, W, 1]`` with values in ``[0, 1]``.
+   Returns
+   -------
+   tf.Tensor
+      Loaded grayscale image tensor.
    """
    image = tf.io.read_file(image_path)
    image = tf.image.decode_png(image, channels=1)  # Grayscale
@@ -122,13 +145,18 @@ def load_image_grayscale(image_path: tf.Tensor) -> tf.Tensor:
    return image # [H,W,1], float32 in [0,1]
 
 def load_image_original(image_path: tf.Tensor) -> tf.Tensor:
-   """Read a PNG image preserving all three channels in float32 format.
+   """
+   Load an image with original channels from file path.
 
-   Args:
-      image_path: Scalar string tensor containing the PNG path.
+   Parameters
+   ----------
+   image_path : tf.Tensor
+      Path to the image file.
 
-   Returns:
-      Float32 tensor of shape ``[H, W, 3]`` with values scaled to ``[0, 1]``.
+   Returns
+   -------
+   tf.Tensor
+      Loaded image tensor with original channels.
    """
    image = tf.io.read_file(image_path)
    image = tf.image.decode_png(image, channels=3)  # Original channels
@@ -136,18 +164,19 @@ def load_image_original(image_path: tf.Tensor) -> tf.Tensor:
    return image # [H,W,3], float32 in [0,1]
 
 def apply_clahe(image: tf.Tensor) -> tf.Tensor:
-   """Apply CLAHE contrast enhancement to a grayscale tensor.
-
-   The image is converted to ``uint8`` for OpenCV CLAHE and then converted back
-   to ``float32`` in the original shape.
-
-   Args:
-      image: Grayscale float32 tensor of shape ``[H, W, 1]``.
-
-   Returns:
-      CLAHE-enhanced float32 tensor of the same shape and range.
    """
+   Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to an image.
 
+   Parameters
+   ----------
+   image : tf.Tensor
+      Input image tensor.
+
+   Returns
+   -------
+   tf.Tensor
+      Image with CLAHE applied.
+   """
    image_uint8 = tf.image.convert_image_dtype(image, tf.uint8)  # [H,W,1], uint8 in [0,255]
    image_uint8 = tf.squeeze(image_uint8, axis=-1)  # [H,W], uint8
    
@@ -162,33 +191,39 @@ def apply_clahe(image: tf.Tensor) -> tf.Tensor:
    return image_clahe  
 
 def _zscore_norm(image: tf.Tensor, eps: float = 1e-7) -> tf.Tensor:
-   """Standardize an image tensor by subtracting the mean and dividing by std.
-
-   Args:
-      image: Float tensor to be normalized.
-      eps: Small constant to avoid division by zero.
-
-   Returns:
-      Tensor with zero mean and unit variance computed per image.
    """
+   Apply z-score normalization to an image.
 
+   Parameters
+   ----------
+   image : tf.Tensor
+      Input image tensor.
+   eps : float
+      Small epsilon for numerical stability.
+
+   Returns
+   -------
+   tf.Tensor
+      Normalized image tensor.
+   """
    mean, variance = tf.nn.moments(image, axes=[0, 1], keepdims=True)
    stddev = tf.sqrt(variance)
    return (image - mean) / (stddev + eps)
 
 def _augment_image(image: tf.Tensor) -> tf.Tensor:
-   """Apply lightweight geometric and photometric augmentation.
-
-   Randomly flips the image horizontally, rotates by ~±2 degrees, and jitters
-   brightness/contrast to encourage invariance.
-
-   Args:
-      image: Float32 tensor of shape ``[H, W, 1]``.
-
-   Returns:
-      Augmented tensor of identical shape.
    """
+   Apply data augmentation to an image.
 
+   Parameters
+   ----------
+   image : tf.Tensor
+      Input image tensor.
+
+   Returns
+   -------
+   tf.Tensor
+      Augmented image tensor.
+   """
    # random flips
    image = tf.image.random_flip_left_right(image)
    # random rotations (~±2 degrees)
@@ -200,16 +235,21 @@ def _augment_image(image: tf.Tensor) -> tf.Tensor:
    return image
 
 def _image_rotate(image: tf.Tensor, angle_rad: tf.Tensor) -> tf.Tensor:
-   """Rotate an image around its center by ``angle_rad`` radians.
-
-   Args:
-      image: Float32 tensor of shape ``[H, W, C]``.
-      angle_rad: Scalar tensor containing the rotation in radians.
-
-   Returns:
-      Rotated tensor of the same shape using bilinear sampling.
    """
+   Rotate an image by a given angle.
 
+   Parameters
+   ----------
+   image : tf.Tensor
+      Input image tensor.
+   angle_rad : tf.Tensor
+      Rotation angle in radians.
+
+   Returns
+   -------
+   tf.Tensor
+      Rotated image tensor.
+   """
    # center-based rotation
    h = tf.cast(tf.shape(image)[0], tf.float32)
    w = tf.cast(tf.shape(image)[1], tf.float32)

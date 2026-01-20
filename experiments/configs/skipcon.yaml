@@ -1,7 +1,13 @@
+# Configuration file for the SkipConCNN model in bone age prediction.
+# This config defines settings for data preprocessing, model architecture, and training parameters.
+# - Data section: Image size, CLAHE application, augmentation, and batch size.
+# - Model section: Base filters, block filters per stage, blocks per stage, dense units, dropout, and gender usage.
+# - Training section: Epochs, patience, learning rate, results CSV, and test evaluation.
+
 data:
   image_size: 256
-  clahe: false
-  augment: true
+  clahe: true
+  augment: false
   batch_size: 16
 
 model:

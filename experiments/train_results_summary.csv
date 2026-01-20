@@ -31,9 +31,3 @@ BaseCNN,305457,7235.35,9.0251,12.0223,8.9279,12.0867,8.5236,11.9073,38,28,experi
 SkipCon_CNN,715953,2956.15,10.2863,13.5844,10.3187,13.998,10.9849,13.3537,32,22,experiments/configs/skipcon.yaml,experiments/checkpoints/SkipCon_CNN/skipcon/SkipCon_CNN_skipcon_08,TRUE,16,FALSE,256,"[32, 64, 128]","[2, 2, 2]",N/A,128,0.2,32,N/A,N/A,N/A,TRUE,70,0.001,10,TRUE,experiments/train_results_summary.csv,N/A,N/A,N/A
 Inception_CNN,9369777,6086.32,7.6991,10.3218,9.1064,12.3329,8.9195,12.0645,24,14,experiments/configs/inception.yaml,experiments/checkpoints/Inception_CNN/inception/Inception_CNN_inception_08,TRUE,16,FALSE,256,N/A,N/A,N/A,128,0.2,32,2,3,1,TRUE,70,0.001,10,TRUE,experiments/train_results_summary.csv,N/A,N/A,N/A
 InSkipCon_CNN,11606705,10949.64,6.9433,9.2792,9.0987,12.1485,8.7692,12.0127,24,14,experiments/configs/inskipcon.yaml,experiments/checkpoints/InSkipCon_CNN/inskipcon/InSkipCon_CNN_inskipcon_08,TRUE,8,FALSE,256,N/A,N/A,N/A,128,0.2,32,2,3,1,TRUE,70,0.001,10,TRUE,experiments/train_results_summary.csv,0.17,0.1,0.2
-,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-,,Overall,3.4186,4.5162,8.398,11.1733,6.7411,8.936,,,,,,,,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-,,Gender: False,3.4186,4.5162,10.7029,14.2737,11.828,16.0136,26,16,0,0,,,,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-,,Gender: True,5.2728,7.0339,8.398,11.1733,6.7411,8.936,,,,,,,,,,,,,,,,,,,,,,,,,,

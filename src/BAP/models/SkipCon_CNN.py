@@ -1,4 +1,8 @@
-"""ResNet-style CNN with residual skip connections for bone-age regression."""
+"""
+This module provides functionality to build a Skip Connection Convolutional Neural Network (CNN) model
+for bone age prediction. The model uses residual blocks with skip connections and can optionally
+include gender information as an additional input to predict age in months.
+"""
 
 from typing import Sequence, Tuple
 
@@ -15,7 +19,21 @@ def build_SkipConCNN(
    dropout_rate: float = 0.2,
    use_gender: bool = False,
 ) -> Model:
-   """Construct a ResNet-style CNN for bone-age regression."""
+   """
+   Builds a Skip Connection CNN model for bone age prediction.
+   
+   Args:
+      input_shape (Tuple[int, int, int]): Shape of the input image (height, width, channels). Default is (512, 512, 1).
+      base_filters (int): Number of filters in the stem convolution. Default is 32.
+      block_filters (Sequence[int]): Number of filters for each stage. Default is (32, 64, 128, 256).
+      blocks_per_stage (Sequence[int]): Number of blocks per stage. Default is (2, 2, 2, 2).
+      dense_units (int): Number of units in the dense layer. Default is 128.
+      dropout_rate (float): Dropout rate for regularization. Default is 0.2.
+      use_gender (bool): Whether to include gender as an additional input. Default is False.
+   
+   Returns:
+      Model: A Keras Model instance for bone age prediction.
+   """
    image_input = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
 
    # Stem
@@ -67,6 +85,18 @@ def SkipConBlock(
    stride: int,
    name: str,
 ) -> tf.Tensor:
+   """
+   Builds a basic residual block with projection skip connection when the shape changes.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      filters (int): Number of filters for the convolutions.
+      stride (int): Stride for the first convolution.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after the residual block.
+   """
    """Basic residual block with projection skip when shape changes."""
    shortcut = x
 

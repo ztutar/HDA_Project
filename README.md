@@ -12,24 +12,23 @@ Training and experimentation toolkit for the RSNA pediatric hand X-ray dataset. 
 
 ```text
 HDA_Project/
-├── main.py                     # Entry point that wires configs, datasets, and trainers
+├── main.py                         # Entry point that wires configs, datasets, and trainers
 ├── data/
-│   ├── images/                 # Optionally store raw RSNA images (train/validation/test)
-│   └── metadata/               # CSV splits consumed by the tf.data pipelines
+│   ├── metadata/                   # CSV splits consumed by the tf.data pipelines
+│   └── img/                        # Optional local copies of RSNA images
 ├── experiments/
-│   ├── configs/                # YAML config files for experiments
-│   ├── checkpoints/            # stores .keras weights, TB logs, and .log files
-│   └── train_results_summary.csv
+│   ├── configs/                    # YAML config files for experiments
+│   ├── checkpoints/                # Stores .keras weights, TB logs, and .log files
+│   └── train_results_summary.csv   # Aggregated run metrics + config values
 ├── src/BAP/
-│   ├── models/                 # Base_CNN.py, SkipCon_CNN.py, Inception_CNN.py, InSkipCon_CNN.py
-│   ├── training/               # Trainer scripts, callbacks, summaries
-│   ├── utils/                  # Config loader, dataset utilities, seed & path helpers
-│   └── visualization/          # Visualization utilities
-├── BoneAgePrediction.ipynb     # Interactive notebook for exploratory work
-├── model_checkpoint/           # Keras exports + metrics/results dicts from notebook
-├── report/                     # Slides and report
-├── pyproject.toml              # Package metadata and entry point required for env setup
-└── README.md                   # You are here!
+│   ├── models/                     # Base_CNN.py, SkipCon_CNN.py, Inception_CNN.py, InSkipCon_CNN.py
+│   ├── training/                   # Trainer scripts, callbacks, summaries
+│   └── utils/                      # Config loader, dataset utilities, plotting, seed & path helpers
+├── BoneAgePrediction.ipynb         # Interactive notebook for exploratory work
+├── model_checkpoint/               # Keras exports + metrics/results dicts from notebook
+├── report/                         # Slides and report
+├── pyproject.toml                  # Package metadata and entry point required for env setup
+└── README.md                       # You are here!
 ```
 
 ## Getting Started
@@ -57,7 +56,7 @@ If the environment already ships with TensorFlow (e.g., Google Colab GPU runtime
 ### Dataset & metadata
 
 1. The first call to `get_rsna_dataset()` (triggered automatically from `main.py`) uses `kagglehub` to download `ipythonx/rsna-bone-age` into your Kaggle cache.
-2. CSV metadata in `data/metadata/{train,validation,test}.csv` should provide at least `Image ID`, `Bone Age (months)`, and `male` columns aligned with the downloaded images.
+2. CSV metadata in `data/metadata/{train,validation,test}.csv` must include `Image ID`, `Bone Age (months)`, and `male` columns aligned with the downloaded images (image IDs should match the `.png` filenames without extension).
 3. Alternatively, download the RSNA Bone Age Dataset from [Stanford’s Box mirror](https://stanfordmedicine.app.box.com/s/4r1zwio6z6lrzk7zw3fro7ql5mnoupcv/folder/42459416739) if you prefer to keep datasets inside the repo instead of the Kaggle cache. Update the data paths in `main.py` accordingly.
 
 ## Notebooks & analysis
@@ -82,7 +81,7 @@ python main.py --model base --config base.yaml
 | `inception`, `inception_cnn` | `BAP.training.train_Inception_CNN` | Inception-V4 style stem and multi-branch blocks; CLAHE/augmentation/gender options. | `experiments/configs/inception.yaml` |
 | `inskipcon`, `inskipcon_cnn` | `BAP.training.train_InSkipCon_CNN` | Inception-ResNet-style hybrid with residual scaling (InSkipCon); CLAHE/augmentation/gender options. | `experiments/configs/inskipcon.yaml` |
 
-If `--config` is omitted, defaults defined in `BAP.utils.config` are used. Each run saves under `experiments/checkpoints/<Model>/<config_name>_<run_id>/` where callbacks store the best `.keras` weights, TensorBoard logs, copied config, and history CSVs.
+If `--config` is omitted, defaults defined in `BAP.utils.config` are used. Each run saves under `experiments/checkpoints/<Model>/<config_name>/<Model>_<config_name>_<run_id>/` where callbacks store the best `.keras` weights, TensorBoard logs, and history CSVs.
 
 ## Experiments & outputs
 

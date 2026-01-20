@@ -1,14 +1,8 @@
 """
-Training entry point for the BaseCNN model.
+This module contains the training logic for the BaseCNN model used in bone age prediction.
 
-This module orchestrates the full lifecycle of a Base convolutional neural
-network used for bone-age prediction. It prepares tf.data pipelines for the
-train/validation/test splits, builds the BaseCNN architecture via
-`build_BaseCNN`, compiles it with mixed precision, and attaches callbacks
-defined in `BAP.training.callbacks`. After training, it optionally evaluates on
-the test split, logs a detailed summary, and appends a CSV summary . The module 
-exposes a single public function, `train_BaseCNN`, which encapsulates these 
-responsibilities and returns the trained Keras model together with its History object.
+The train_BaseCNN function handles the complete training pipeline including data preparation,
+model building, compilation, training, evaluation, and saving results.
 """
 
 
@@ -27,11 +21,13 @@ from BAP.utils.logger import get_logger, mirror_keras_stdout_to_file
 from BAP.utils.config import ProjectConfig
 from BAP.utils.dataset_loader import make_dataset
 from BAP.utils.path_manager import save_model_dicts
+from BAP.utils.summary import append_summary_row
 
 from BAP.models.Base_CNN import build_BaseCNN
 
 from BAP.training.callbacks import make_callbacks
-from BAP.training.summary import append_summary_row
+
+
 
 logger = get_logger(__name__)
 
@@ -41,42 +37,25 @@ def train_BaseCNN(
    save_dir: str
 ) -> Tuple[keras.Model, keras.callbacks.History]:
    """
-   Train, evaluate, and persist a BaseCNN instance.
+   Train the BaseCNN model for bone age prediction.
+
+   This function performs the entire training process including data loading, model construction,
+   training with callbacks, evaluation, and saving results to disk.
 
    Parameters
    ----------
    paths : dict
-      Mapping that points to image directories for train/val (and optionally
-      test) splits. Keys are expected to include `train`, `val`, and `test`.
+      Dictionary containing paths to train, validation, and test image directories.
    config_bundle : ProjectConfig
-      Structured configuration containing data, model, and training sections.
-      Controls dataset construction (image size, batching, augmentations),
-      model architecture (channels, dense units, dropout, gender usage), and
-      training hyperparameters (learning rate, epochs, patience, logging paths).
+      Configuration object containing data, model, and training settings.
    save_dir : str
-      Destination directory where checkpoints, metrics, and summaries will be
-      persisted.
+      Directory path where model checkpoints and results will be saved.
 
    Returns
    -------
    Tuple[keras.Model, keras.callbacks.History]
-      The trained model along with the Keras History capturing per-epoch logs.
-
-   Workflow
-   --------
-   1. Mirror stdout to file for reproducible logs and enforce mixed precision.
-   2. Build train/val tf.data pipelines with metadata-driven labels, optional
-      augmentation, and prefetching for throughput.
-   3. Instantiate BaseCNN via `build_BaseCNN` with config-driven topology.
-   4. Compile with an Adam optimizer (wrapped in loss scaling), Huber loss, and
-      MAE/RMSE metrics.
-   5. Set up callbacks (checkpoints, early stopping, LR scheduling) and launch
-      training while timing the run.
-   6. Optionally evaluate on the test split, gather best-epoch statistics, log
-      summaries, and append results to the experiment CSV.
-   7. Persist model metadata/metrics JSON files and return the trained artifacts.
+      The trained Keras model and the training history object.
    """
-
    mirror_keras_stdout_to_file()
    
    # -----------------------

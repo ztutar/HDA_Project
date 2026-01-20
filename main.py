@@ -1,3 +1,9 @@
+"""
+This is the main entry point for training bone age prediction models.
+
+It provides a command-line interface to train different CNN models using configurable settings.
+"""
+
 from typing import Optional
 import argparse
 import os
@@ -27,7 +33,16 @@ MODEL_REGISTRY = {
 }
 
 def main(model_name: str, config_path: Optional[str]) -> None:
+   """
+   Main function to train a bone age prediction model.
 
+   Parameters
+   ----------
+   model_name : str
+      Name of the model to train.
+   config_path : Optional[str]
+      Path to the configuration file.
+   """
    # Check if the model is supported
    normalized_name = model_name.strip().lower()
    if normalized_name not in MODEL_REGISTRY:

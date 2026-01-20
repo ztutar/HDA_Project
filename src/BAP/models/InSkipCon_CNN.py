@@ -1,4 +1,8 @@
-"""Inception-ResNet-v2-style CNN backbone (InSkipCon) for bone age regression."""
+"""
+This module provides functionality to build an Inception-ResNet Convolutional Neural Network (CNN) model
+with skip connections for bone age prediction. The model is based on Inception-ResNet-v2 architecture
+and can optionally include gender information as an additional input to predict age in months.
+"""
 
 from typing import Optional, Tuple
 
@@ -19,7 +23,25 @@ def build_InSkipConCNN(
    head_dropout: float = 0.3,
    use_gender: bool = False,
 ) -> Model:
-   """Construct an Inception-ResNet-v2-inspired CNN for bone-age regression."""
+   """
+   Builds an Inception-ResNet CNN model with skip connections for bone age prediction.
+   
+   Args:
+      input_shape (Tuple[int, int, int]): Shape of the input image (height, width, channels). Default is (512, 512, 1).
+      base_filters (int): Base number of filters used in the model. Default is 32.
+      num_a_blocks (int): Number of InceptionResNet-A blocks. Default is 5.
+      num_b_blocks (int): Number of InceptionResNet-B blocks. Default is 10.
+      num_c_blocks (int): Number of InceptionResNet-C blocks. Default is 5.
+      scale_a (float): Scaling factor for residual in A blocks. Default is 0.17.
+      scale_b (float): Scaling factor for residual in B blocks. Default is 0.1.
+      scale_c (float): Scaling factor for residual in C blocks. Default is 0.2.
+      head_dense_units (int): Number of units in the head dense layer. Default is 128.
+      head_dropout (float): Dropout rate for the head. Default is 0.3.
+      use_gender (bool): Whether to include gender as an additional input. Default is False.
+   
+   Returns:
+      Model: A Keras Model instance for bone age prediction.
+   """
    image_input = layers.Input(shape=input_shape, dtype=tf.float32, name="image")
 
    x = Stem(image_input, base_filters=base_filters)
@@ -75,8 +97,6 @@ def build_InSkipConCNN(
 # --------------------------------------
 # Helper layers / blocks
 # --------------------------------------
-
-
 def Conv_BN_ReLU(
    x: tf.Tensor,
    filters: int,
@@ -85,6 +105,20 @@ def Conv_BN_ReLU(
    padding: str = "same",
    name: Optional[str] = None,
 ) -> tf.Tensor:
+   """
+   Applies a sequence of Conv2D, BatchNormalization, and ReLU activation.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      filters (int): Number of filters for the Conv2D layer.
+      kernel_size: Kernel size for the Conv2D layer.
+      strides (int): Strides for the Conv2D layer. Default is 1.
+      padding (str): Padding mode. Default is "same".
+      name (Optional[str]): Name prefix for the layers.
+   
+   Returns:
+      tf.Tensor: Output tensor after Conv2D -> BN -> ReLU.
+   """
    """Conv2D -> BatchNorm -> ReLU helper."""
    x = layers.Conv2D(
       filters=filters,
@@ -104,6 +138,18 @@ def _residual_add(
    scale: float,
    name: str,
 ) -> tf.Tensor:
+   """
+   Scales the residual branch and adds it to the shortcut connection.
+   
+   Args:
+      x (tf.Tensor): Shortcut tensor.
+      residual (tf.Tensor): Residual tensor to be added.
+      scale (float): Scaling factor for the residual.
+      name (str): Name prefix for the operations.
+   
+   Returns:
+      tf.Tensor: Output tensor after adding residual and applying ReLU.
+   """
    """Scale the residual branch and add it to the shortcut."""
    if scale != 1.0:
       residual = layers.Lambda(lambda t: t * scale, name=f"{name}_scale")(residual)
@@ -112,6 +158,16 @@ def _residual_add(
 
 
 def Stem(x: tf.Tensor, base_filters: int) -> tf.Tensor:
+   """
+   Builds the Inception-ResNet-v2 stem block with factorized downsamples.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+   
+   Returns:
+      tf.Tensor: Output tensor after stem processing.
+   """
    """Inception-ResNet-v2 stem with factorized downsamples."""
    x = Conv_BN_ReLU(x, filters=base_filters, kernel_size=3, strides=2, padding="same", name="stem_conv1")
    x = Conv_BN_ReLU(x, filters=base_filters, kernel_size=3, padding="same", name="stem_conv2")
@@ -140,6 +196,18 @@ def InceptionResNet_A(
    scale: float,
    name: str,
 ) -> tf.Tensor:
+   """
+   Builds the 35x35 grid Inception-ResNet-A block.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      scale (float): Scaling factor for the residual.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-ResNet-A processing.
+   """
    """35x35 grid Inception-ResNet-A block."""
    shortcut = x
 
@@ -170,6 +238,18 @@ def InceptionResNet_B(
    scale: float,
    name: str,
 ) -> tf.Tensor:
+   """
+   Builds the 17x17 grid Inception-ResNet-B block with factorized convolutions.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      scale (float): Scaling factor for the residual.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-ResNet-B processing.
+   """
    """17x17 grid Inception-ResNet-B block with factorized convolutions."""
    shortcut = x
 
@@ -203,6 +283,18 @@ def InceptionResNet_C(
    scale: float,
    name: str,
 ) -> tf.Tensor:
+   """
+   Builds the 8x8 grid Inception-ResNet-C block.
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      scale (float): Scaling factor for the residual.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Inception-ResNet-C processing.
+   """
    """8x8 grid Inception-ResNet-C block."""
    shortcut = x
 
@@ -233,6 +325,17 @@ def InceptionResNet_C(
 
 
 def Reduction_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the Reduction-A block (35x35 -> 17x17).
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Reduction-A processing.
+   """
    """Reduction-A block (35x35 -> 17x17)."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=3, strides=2, padding="same", name=f"{name}_b1")
 
@@ -246,6 +349,17 @@ def Reduction_A(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
 
 
 def Reduction_B(x: tf.Tensor, base_filters: int, name: str) -> tf.Tensor:
+   """
+   Builds the Reduction-B block (17x17 -> 8x8).
+   
+   Args:
+      x (tf.Tensor): Input tensor.
+      base_filters (int): Base number of filters.
+      name (str): Name prefix for the block.
+   
+   Returns:
+      tf.Tensor: Output tensor after Reduction-B processing.
+   """
    """Reduction-B block (17x17 -> 8x8)."""
    b1 = Conv_BN_ReLU(x, filters=base_filters * 6, kernel_size=1, name=f"{name}_b1_reduce")
    b1 = Conv_BN_ReLU(b1, filters=base_filters * 8, kernel_size=3, strides=2, padding="same", name=f"{name}_b1")
