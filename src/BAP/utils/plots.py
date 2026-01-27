@@ -7,6 +7,7 @@ It includes functions to display images, plot distributions, and compare model m
 import pandas as pd
 from pathlib import Path
 import os
+import contextlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
@@ -14,6 +15,19 @@ import numpy as np
 from typing import Any, Dict, Sequence, Union
 from IPython.display import display
 from BAP.utils.dataset_loader import load_image_original, load_image_grayscale, apply_clahe
+
+@contextlib.contextmanager
+def _suppress_stderr_fd() -> None:
+   """Redirect OS-level stderr to /dev/null to hide C++ logs."""
+   devnull_fd = os.open(os.devnull, os.O_WRONLY)
+   old_stderr_fd = os.dup(2)
+   try:
+      os.dup2(devnull_fd, 2)
+      yield
+   finally:
+      os.dup2(old_stderr_fd, 2)
+      os.close(old_stderr_fd)
+      os.close(devnull_fd)
 
 def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: int=4) -> None:
    """
@@ -29,17 +43,18 @@ def display_sample_images(metadata: pd.DataFrame, image_dir: Path, n_samples: in
       Number of samples to display.
    """
    sample_metadata = metadata.sample(n_samples)
-   plt.figure(figsize=(15, 5))
-   for i, (idx, row) in enumerate(sample_metadata.iterrows()):
-      image_id = row['Image ID']
-      image_path = os.path.join(image_dir, f'{image_id}.png')
-      image = load_image_original(image_path)
-      plt.subplot(1, n_samples, i + 1)
-      plt.imshow(image)
-      boneage = row['Bone Age (months)'] 
-      plt.title(f"Image ID: {image_id}\nBone Age: {boneage} months\nGender: {'Male' if row['male'] else 'Female'}")
-      plt.axis('off')
-   plt.show()
+   with _suppress_stderr_fd():
+      plt.figure(figsize=(15, 5))
+      for i, (idx, row) in enumerate(sample_metadata.iterrows()):
+         image_id = row['Image ID']
+         image_path = os.path.join(image_dir, f'{image_id}.png')
+         image = load_image_original(image_path)
+         plt.subplot(1, n_samples, i + 1)
+         plt.imshow(image)
+         boneage = row['Bone Age (months)'] 
+         plt.title(f"Image ID: {image_id}\nBone Age: {boneage} months\nGender: {'Male' if row['male'] else 'Female'}")
+         plt.axis('off')
+      plt.show()
    
    
 def plot_distributions(metadata: Union[pd.DataFrame, Dict[str, pd.DataFrame]]) -> None:
@@ -448,5 +463,3 @@ def plot_best_epoch_metrics(
    fig.suptitle("Model Comparisons - MAE per Split", fontsize=14)
    plt.tight_layout(rect=[0, 0, 1, 0.94])
    plt.show()
-
-
